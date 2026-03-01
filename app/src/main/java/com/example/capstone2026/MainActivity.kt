@@ -22,8 +22,10 @@ import com.example.capstone2026.ScheduleViewModel
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -54,87 +56,87 @@ class MainActivity : ComponentActivity() {
     }
 }
 
-@Composable
-fun LoginScreen(){
-    var email by remember { mutableStateOf("") }
-    var password by remember { mutableStateOf("") }
-    var message by remember { mutableStateOf("") }
-
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(24.dp),
-        verticalArrangement = Arrangement.Center,
-        horizontalAlignment = Alignment.CenterHorizontally
-    ){
-        Text(
-            text = "Login",
-            style = MaterialTheme.typography.headlineMedium
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Email Input
-        OutlinedTextField(
-            value = email,
-            onValueChange = { email = it },
-            label = { Text("Email") },
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Email
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Password Input
-        OutlinedTextField(
-            value = password,
-            onValueChange = { password = it },
-            label = { Text("Password") },
-            visualTransformation = PasswordVisualTransformation(),
-            keyboardOptions = KeyboardOptions(
-                keyboardType = KeyboardType.Password
-            ),
-            modifier = Modifier.fillMaxWidth()
-        )
-
-        Spacer(modifier = Modifier.height(24.dp))
-
-        // Login Button
-        Button(
-            onClick = {
-                if (email == "test@example.com" && password == "1234") {
-                    message = "Login Successful!"
-                } else {
-                    message = "Invalid credentials"
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text("Login")
-        }
-
-        Spacer(modifier = Modifier.height(16.dp))
-
-        Button(
-            onClick = {
-
-            },
-            modifier = Modifier.fillMaxWidth()
-        ){
-            Text("Login with Google")
-        }
-
-        // Result Message
-        if (message.isNotEmpty()) {
-            Text(
-                text = message,
-                color = MaterialTheme.colorScheme.primary
-            )
-        }
-    }
-}
+//@Composable
+//fun LoginScreen(){
+//    var email by remember { mutableStateOf("") }
+//    var password by remember { mutableStateOf("") }
+//    var message by remember { mutableStateOf("") }
+//
+//    Column(
+//        modifier = Modifier
+//            .fillMaxSize()
+//            .padding(24.dp),
+//        verticalArrangement = Arrangement.Center,
+//        horizontalAlignment = Alignment.CenterHorizontally
+//    ){
+//        Text(
+//            text = "Login",
+//            style = MaterialTheme.typography.headlineMedium
+//        )
+//
+//        Spacer(modifier = Modifier.height(24.dp))
+//
+//        // Email Input
+//        OutlinedTextField(
+//            value = email,
+//            onValueChange = { email = it },
+//            label = { Text("Email") },
+//            keyboardOptions = KeyboardOptions(
+//                keyboardType = KeyboardType.Email
+//            ),
+//            modifier = Modifier.fillMaxWidth()
+//        )
+//
+//        Spacer(modifier = Modifier.height(12.dp))
+//
+//        // Password Input
+//        OutlinedTextField(
+//            value = password,
+//            onValueChange = { password = it },
+//            label = { Text("Password") },
+//            visualTransformation = PasswordVisualTransformation(),
+//            keyboardOptions = KeyboardOptions(
+//                keyboardType = KeyboardType.Password
+//            ),
+//            modifier = Modifier.fillMaxWidth()
+//        )
+//
+//        Spacer(modifier = Modifier.height(24.dp))
+//
+//        // Login Button
+//        Button(
+//            onClick = {
+//                if (email == "test@example.com" && password == "1234") {
+//                    message = "Login Successful!"
+//                } else {
+//                    message = "Invalid credentials"
+//                }
+//            },
+//            modifier = Modifier.fillMaxWidth()
+//        ) {
+//            Text("Login")
+//        }
+//
+//        Spacer(modifier = Modifier.height(16.dp))
+//
+//        Button(
+//            onClick = {
+//
+//            },
+//            modifier = Modifier.fillMaxWidth()
+//        ){
+//            Text("Login with Google")
+//        }
+//
+//        // Result Message
+//        if (message.isNotEmpty()) {
+//            Text(
+//                text = message,
+//                color = MaterialTheme.colorScheme.primary
+//            )
+//        }
+//    }
+//}
 
 @Composable
 fun AppMenu(
@@ -179,11 +181,17 @@ fun AppMenu(
 
         Spacer(Modifier.height(16.dp))
 
-        // Same button you already had
         Button(
-            onClick = { isExpanded = !isExpanded }
+            onClick = { isExpanded = !isExpanded },
+            modifier = Modifier.size(64.dp),   // Makes it round
+            shape = CircleShape,
+            contentPadding = PaddingValues(0.dp)
         ) {
-            Text(if (isExpanded) "Close" else "Menu")
+            Text(
+                text = if (isExpanded) "×" else "+",
+                fontSize = 28.sp,
+                textAlign = TextAlign.Center
+            )
         }
     }
 }
@@ -221,13 +229,11 @@ fun ScheduleScreen(navController: NavController) {
             .padding(24.dp)
     ) {
 
-        // Your screen content
         Text(
             "Schedule Screen",
             modifier = Modifier.align(Alignment.Center)
         )
 
-        // Same menu button
         Box(
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
@@ -303,24 +309,8 @@ fun SpeedDialItem(
 
 @Preview(showBackground = true)
 @Composable
-fun LoginScreenPreview(){
-    Capstone2026Theme {
-        LoginScreen()
-    }
-}
-
-@Preview(showBackground = true)
-@Composable
 fun ScheduleScreenPreview(){
     Capstone2026Theme {
         AppNavGraph()
     }
 }
-
-//@Preview(showBackground = true)
-//@Composable
-//fun GreetingPreview() {
-//    Capstone2026Theme {
-//        Greeting("Android")
-//    }
-//}
