@@ -30,6 +30,11 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.capstone2026.ui.theme.Capstone2026Theme
 
+private val navigation: Any
+    get() {
+        TODO()
+    }
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
