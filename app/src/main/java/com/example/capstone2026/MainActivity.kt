@@ -10,8 +10,6 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.*
 import androidx.compose.foundation.text.KeyboardOptions
@@ -24,11 +22,12 @@ import com.example.capstone2026.ScheduleViewModel
 import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+import androidx.navigation.NavController
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import androidx.navigation.compose.rememberNavController
 import com.example.capstone2026.ui.theme.Capstone2026Theme
 
 class MainActivity : ComponentActivity() {
@@ -43,26 +42,12 @@ class MainActivity : ComponentActivity() {
 //                        modifier = Modifier.padding(innerPadding)
 //                    )
 //                }
-                ScheduleScreen()
+                //ScheduleScreen()
+                AppNavGraph()
             }
         }
     }
 }
-
-//@Composable
-//fun Greeting(name: String, modifier: Modifier = Modifier) {
-//    Text(
-//        text = "Howdy, $name!",
-//        modifier = modifier.padding(16.sp)
-//    ){
-//        Text(
-//            text = "Login",
-//            style = MaterialTheme.typography.headlineMedium
-//        )
-//
-//
-//    }
-//}
 
 @Composable
 fun LoginScreen(){
@@ -147,74 +132,145 @@ fun LoginScreen(){
 }
 
 @Composable
-fun ScheduleScreen(){
+fun AppMenu(
+    navController: NavController
+) {
     var isExpanded by remember { mutableStateOf(false) }
 
-//    Column(
-//        modifier = Modifier
-//            .fillMaxSize()
-//            .padding(24.dp),
-//        verticalArrangement = Arrangement.Center,
-//        horizontalAlignment = Alignment.CenterHorizontally
-//    ){
-//
-//    }
+    Column(
+        horizontalAlignment = Alignment.End
+    ) {
 
-    Box(
-        modifier = Modifier.fillMaxSize()
-    ){
-        Button(
-            onClick = {
-                isExpanded = !isExpanded
-            },
-            modifier = Modifier
-                .size(80.dp)
-                .padding(vertical = 8.dp, horizontal = 8.dp)
-                .align(Alignment.BottomEnd),
-            shape = CircleShape,
-
-        ){
-            Text(
-                text = "+",
-                fontSize = 40.sp,
-                textAlign = TextAlign.Center
-            )
+        AnimatedVisibility(visible = isExpanded) {
+            SpeedDialItem("Home") {
+                navController.navigate("home") {
+                    launchSingleTop = true
+                }
+                isExpanded = false
+            }
         }
 
-        Column(
-            modifier = Modifier
-                .align(Alignment.BottomEnd)
-                .padding(bottom = 100.dp), // Push menu above button
-            horizontalAlignment = Alignment.End
+        Spacer(Modifier.height(12.dp))
+
+        AnimatedVisibility(visible = isExpanded) {
+            SpeedDialItem("Schedule") {
+                navController.navigate("schedule") {
+                    launchSingleTop = true
+                }
+                isExpanded = false
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        AnimatedVisibility(visible = isExpanded) {
+            SpeedDialItem("Settings") {
+                navController.navigate("settings") {
+                    launchSingleTop = true
+                }
+                isExpanded = false
+            }
+        }
+
+        Spacer(Modifier.height(16.dp))
+
+        // Same button you already had
+        Button(
+            onClick = { isExpanded = !isExpanded }
         ) {
+            Text(if (isExpanded) "Close" else "Menu")
+        }
+    }
+}
 
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = fadeIn() + slideInVertically { it / 2 },
-                exit = fadeOut() + slideOutVertically { it / 2 }
-            ) {
-                SpeedDialItem(
-                    text = "Test 1",
-                    onClick = {
-                        isExpanded = false
-                    }
-                )
-            }
+@Composable
+fun AppNavGraph() {
 
-            Spacer(modifier = Modifier.height(12.dp))
+    val navController = rememberNavController()
 
-            AnimatedVisibility(
-                visible = isExpanded,
-                enter = fadeIn() + slideInVertically { it / 2 },
-                exit = fadeOut() + slideOutVertically { it / 2 }
-            ) {
-                SpeedDialItem(
-                    text = "Test 2",
-                    onClick = {
-                        isExpanded = false
-                    }
-                )
-            }
+    NavHost(
+        navController = navController,
+        startDestination = "home"
+    ) {
+
+        composable("home") {
+            HomeScreen(navController)
+        }
+
+        composable("schedule") {
+            ScheduleScreen(navController)
+        }
+
+        composable("settings") {
+            SettingsScreen(navController)
+        }
+    }
+}
+
+@Composable
+fun ScheduleScreen(navController: NavController) {
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+    ) {
+
+        // Your screen content
+        Text(
+            "Schedule Screen",
+            modifier = Modifier.align(Alignment.Center)
+        )
+
+        // Same menu button
+        Box(
+            modifier = Modifier.align(Alignment.BottomEnd)
+        ) {
+            AppMenu(navController)
+        }
+    }
+}
+
+@Composable
+fun HomeScreen(navController: NavController) {
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+    ) {
+
+        Text(
+            "Home Screen",
+            modifier = Modifier.align(Alignment.Center)
+        )
+
+        Box(
+            modifier = Modifier.align(Alignment.BottomEnd)
+        ) {
+            AppMenu(navController)
+        }
+    }
+}
+
+@Composable
+fun SettingsScreen(navController: NavController) {
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp)
+    ) {
+
+        Text(
+            "Settings Screen",
+            modifier = Modifier.align(Alignment.Center)
+        )
+
+        Box(
+            modifier = Modifier.align(Alignment.BottomEnd)
+        ) {
+            AppMenu(navController)
         }
     }
 }
@@ -252,7 +308,7 @@ fun LoginScreenPreview(){
 @Composable
 fun ScheduleScreenPreview(){
     Capstone2026Theme {
-        ScheduleScreen()
+        AppNavGraph()
     }
 }
 
