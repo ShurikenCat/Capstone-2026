@@ -14,7 +14,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.capstone2026"
-        minSdk = 24
+        minSdk = 26
         targetSdk = 36
         versionCode = 1
         versionName = "1.0"
@@ -66,4 +66,6 @@ dependencies {
 
     // DataStore (Preferences)
     implementation("androidx.datastore:datastore-preferences:1.1.1")
+
+    implementation("org.mnode.ical4j:ical4j:2.0.5")
 }

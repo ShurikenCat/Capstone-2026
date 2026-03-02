@@ -3,34 +3,31 @@ package com.example.capstone2026
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.activity.viewModels
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.animation.*
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.*
-import androidx.compose.foundation.text.KeyboardOptions
-import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
-import com.example.capstone2026.ScheduleViewModel
-import androidx.compose.ui.draw.shadow
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.capstone2026.ui.theme.Capstone2026Theme
+import java.text.SimpleDateFormat
+import java.util.Date
+import java.util.Locale
 
 private val navigation: Any
     get() {
@@ -183,7 +180,7 @@ fun AppMenu(
 
         Button(
             onClick = { isExpanded = !isExpanded },
-            modifier = Modifier.size(64.dp),   // Makes it round
+            modifier = Modifier.size(64.dp),
             shape = CircleShape,
             contentPadding = PaddingValues(0.dp)
         ) {
@@ -223,16 +220,50 @@ fun AppNavGraph() {
 @Composable
 fun ScheduleScreen(navController: NavController) {
 
+    val context = LocalContext.current
+
+    // Load events once
+    val events by remember {
+        mutableStateOf(
+            try {
+                val input = loadIcsFromAssets(context, "schedule.ics")
+                parseIcsFile(input)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emptyList()
+            }
+        )
+    }
+
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
+            .padding(16.dp)
     ) {
-
-        Text(
-            "Schedule Screen",
-            modifier = Modifier.align(Alignment.Center)
-        )
+        Column(
+            modifier = Modifier.fillMaxSize()
+        ) {
+            if (events.isEmpty()) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("No events found")
+                }
+            } else {
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .weight(1f)
+                ) {
+                    items(events) { event: CalendarEvent ->
+                        EventCard(event)
+                    }
+                }
+            }
+        }
 
         Box(
             modifier = Modifier.align(Alignment.BottomEnd)
@@ -250,7 +281,6 @@ fun HomeScreen(navController: NavController) {
             .fillMaxSize()
             .padding(24.dp)
     ) {
-
         Text(
             "Home Screen",
             modifier = Modifier.align(Alignment.Center)
@@ -272,7 +302,6 @@ fun SettingsScreen(navController: NavController) {
             .fillMaxSize()
             .padding(24.dp)
     ) {
-
         Text(
             "Settings Screen",
             modifier = Modifier.align(Alignment.Center)
@@ -307,6 +336,52 @@ fun SpeedDialItem(
     }
 }
 
+@Composable
+fun EventCard(event: CalendarEvent) {
+
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 6.dp),
+        elevation = CardDefaults.cardElevation(4.dp)
+    ) {
+
+        Column(
+            modifier = Modifier.padding(12.dp)
+        ) {
+
+            Text(
+                text = event.title,
+                fontSize = 18.sp,
+                fontWeight = FontWeight.Bold
+            )
+
+            Spacer(Modifier.height(4.dp))
+
+            Text(
+                text = "Start: ${formatDate(event.start)}",
+                fontSize = 14.sp
+            )
+
+            event.end?.let {
+
+                Text(
+                    text = "End: ${formatDate(it)}",
+                    fontSize = 14.sp
+                )
+            }
+        }
+    }
+}
+
+fun formatDate(date: Date): String {
+
+    val formatter =
+        SimpleDateFormat("MMM dd, yyyy • HH:mm", Locale.getDefault())
+
+    return formatter.format(date)
+}
+
 @Preview(showBackground = true)
 @Composable
 fun ScheduleScreenPreview(){
@@ -314,3 +389,9 @@ fun ScheduleScreenPreview(){
         AppNavGraph()
     }
 }
+
+data class CalendarEvent(
+    val title: String,
+    val start: Date,
+    val end: Date?
+)
