@@ -68,4 +68,5 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.1")
 
     implementation("org.mnode.ical4j:ical4j:2.0.5")
+    implementation("com.kizitonwose.calendar:compose:2.10.0")
 }
