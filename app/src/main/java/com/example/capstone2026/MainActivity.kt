@@ -44,10 +44,7 @@ import java.time.YearMonth
 import java.time.ZoneId
 import java.util.*
 
-private val navigation: Any
-    get() {
-        TODO()
-    }
+
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -90,6 +87,17 @@ fun AppMenu(
         AnimatedVisibility(visible = isExpanded) {
             SpeedDialItem("Home") {
                 navController.navigate("home") {
+                    launchSingleTop = true
+                }
+                isExpanded = false
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        AnimatedVisibility(visible = isExpanded) {
+            SpeedDialItem("Upload") {
+                navController.navigate("upload"){
                     launchSingleTop = true
                 }
                 isExpanded = false
@@ -152,6 +160,9 @@ fun AppNavGraph(
 
         composable("home") {
             HomeScreen(navController)
+        }
+        composable("upload"){
+            UploadSyllabusScreen()
         }
 
         // this is the default schedule
