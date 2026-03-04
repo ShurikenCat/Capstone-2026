@@ -13,6 +13,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
@@ -30,6 +31,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.capstone2026.ui.theme.Capstone2026Theme
+import com.example.capstone2026.ui.theme.ThemeMode
 import com.kizitonwose.calendar.compose.HorizontalCalendar
 import com.kizitonwose.calendar.compose.WeekCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
@@ -51,16 +53,25 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+
         setContent {
-            Capstone2026Theme {
-//                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-//                    Greeting(
-//                        name = "Hello World",
-//                        modifier = Modifier.padding(innerPadding)
-//                    )
-//                }
-                //ScheduleScreen()
-                AppNavGraph()
+            var themeMode by remember { mutableStateOf(ThemeMode.SYSTEM) }
+
+            val isSystemDark = isSystemInDarkTheme()
+            val isDarkTheme = when (themeMode) {
+                ThemeMode.LIGHT -> false
+                ThemeMode.DARK -> true
+                ThemeMode.SYSTEM -> isSystemDark
+            }
+
+            Capstone2026Theme(darkTheme = isDarkTheme) {
+                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
+                    AppNavGraph(
+                        modifier = Modifier.padding(innerPadding),
+                        themeMode = themeMode,
+                        onThemeModeChange = { themeMode = it }
+                    )
+                }
             }
         }
     }
@@ -125,13 +136,18 @@ fun AppMenu(
 }
 
 @Composable
-fun AppNavGraph() {
+fun AppNavGraph(
+    modifier: Modifier = Modifier,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit
+) {
 
     val navController = rememberNavController()
 
     NavHost(
         navController = navController,
-        startDestination = "home"
+        startDestination = "home",
+        modifier = modifier
     ) {
 
         composable("home") {
@@ -161,7 +177,11 @@ fun AppNavGraph() {
         }
 
         composable("settings") {
-            SettingsScreen(navController)
+            SettingsScreen(
+                navController = navController,
+                themeMode = themeMode,
+                onThemeModeChange = onThemeModeChange
+            )
         }
     }
 }
@@ -619,21 +639,67 @@ fun HomeScreen(navController: NavController) {
 }
 
 @Composable
-fun SettingsScreen(navController: NavController) {
-
+fun SettingsScreen(
+    navController: NavController,
+    themeMode: ThemeMode,
+    onThemeModeChange: (ThemeMode) -> Unit
+) {
     Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(24.dp)
     ) {
-        Text(
-            "Settings Screen",
-            modifier = Modifier.align(Alignment.Center)
-        )
-
-        Box(
-            modifier = Modifier.align(Alignment.BottomEnd)
+        Column(
+            modifier = Modifier.align(Alignment.TopStart)
         ) {
+            Text(
+                text = "Settings",
+                style = MaterialTheme.typography.headlineMedium
+            )
+
+            Spacer(modifier = Modifier.height(24.dp))
+
+            Text(
+                text = "Theme",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            Spacer(modifier = Modifier.height(8.dp))
+
+            Column {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = themeMode == ThemeMode.SYSTEM,
+                        onClick = { onThemeModeChange(ThemeMode.SYSTEM) }
+                    )
+                    Text("Use system setting")
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = themeMode == ThemeMode.LIGHT,
+                        onClick = { onThemeModeChange(ThemeMode.LIGHT) }
+                    )
+                    Text("Light")
+                }
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    RadioButton(
+                        selected = themeMode == ThemeMode.DARK,
+                        onClick = { onThemeModeChange(ThemeMode.DARK) }
+                    )
+                    Text("Dark")
+                }
+            }
+        }
+
+        Box(modifier = Modifier.align(Alignment.BottomEnd)) {
             AppMenu(navController)
         }
     }
@@ -736,13 +802,17 @@ fun formatDate(date: Date): String {
     return formatter.format(date)
 }
 
-@Preview(showBackground = true)
-@Composable
-fun ScheduleScreenPreview(){
-    Capstone2026Theme {
-        AppNavGraph()
-    }
-}
+//@Preview(showBackground = true)
+//@Composable
+//fun ScheduleScreenPreview(){
+//    Capstone2026Theme {
+//        AppNavGraph(
+//            modifier = Modifier.padding(innerPadding),
+//            themeMode = themeMode,
+//            onThemeModeChange = { themeMode = it }
+//        )
+//    }
+//}
 
 // helper functions
 data class CalendarEvent(
