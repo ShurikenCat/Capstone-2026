@@ -26,17 +26,21 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
+import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.capstone2026.ui.theme.Capstone2026Theme
 import com.example.capstone2026.ui.theme.ThemeMode
+import com.example.capstone2026.ui.theme.readThemeMode
+import com.example.capstone2026.ui.theme.saveThemeMode
 import com.kizitonwose.calendar.compose.HorizontalCalendar
 import com.kizitonwose.calendar.compose.WeekCalendar
 import com.kizitonwose.calendar.compose.rememberCalendarState
 import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import com.kizitonwose.calendar.core.daysOfWeek
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -55,7 +59,8 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         setContent {
-            var themeMode by remember { mutableStateOf(ThemeMode.SYSTEM) }
+            val themeModeFlow = applicationContext.readThemeMode()
+            val themeMode by themeModeFlow.collectAsState(initial = ThemeMode.SYSTEM)
 
             val isSystemDark = isSystemInDarkTheme()
             val isDarkTheme = when (themeMode) {
@@ -69,7 +74,11 @@ class MainActivity : ComponentActivity() {
                     AppNavGraph(
                         modifier = Modifier.padding(innerPadding),
                         themeMode = themeMode,
-                        onThemeModeChange = { themeMode = it }
+                        onThemeModeChange = { newMode ->
+                            lifecycleScope.launch {
+                                applicationContext.saveThemeMode(newMode)
+                            }
+                        }
                     )
                 }
             }
