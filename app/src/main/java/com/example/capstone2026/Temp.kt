@@ -48,10 +48,10 @@ class Temp : ComponentActivity() {
                     }
                     Spacer(Modifier.height(16.dp))
                     Button(onClick = {
-                        val next = if (defaultView == "week") "day" else "week"
+                        val next = if (defaultView == "week") "day" else (if (defaultView == "day") "month" else "week")
                         viewModel.setDefaultView(next)
                     }) {
-                        Text("Toggle view (day/week)")
+                        Text("Toggle view (day/week/month)")
                     }
                 }
             }
