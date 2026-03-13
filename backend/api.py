@@ -16,24 +16,33 @@ app.add_middleware(
 
 @app.get("/health")
 def health():
-    return {"Status": "ok"}
+    return {"status": "ok"}
 
 @app.post("/extract")
 async def extract(file: UploadFile = File(...)):
-    #Save uploaded pdf to a temp path
-    suffix = os.path.splitext(file.filename)[1] or ".pdf"
-    with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(await file.read())
         tmp_path = tmp.name
 
     try:
-        events =extract_schedule_from_pdf(tmp_path)
+        events = extract_schedule_from_pdf(tmp_path)
 
-        #convert datetime objects to ISO strings for JSON
-        for e in events:
-            if "date" in e and e["date"] is not None:
-                e["date"] = e["date"].isoformat()
+        if events is None:
+            return {
+                "count": 0,
+                "events": [],
+                "warning": "extract_schedule_from_pdf returned None" 
+            }
+        
+        for event in events:
+            if "date" in event and event["date"] is not None:
+                event["date"] = str(event["date"])
 
-            return{"count": len(events), "events": events}
+        return{
+            "count": len(events),
+            "events": events
+            
+        }
     finally:
         os.remove(tmp_path)
+        

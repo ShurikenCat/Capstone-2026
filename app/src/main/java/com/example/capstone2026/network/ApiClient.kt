@@ -15,8 +15,9 @@ object ApiClient {
         .build()
 
     val api: ApiService = Retrofit.Builder()
-        .baseUrl(BASE_URL)
-        .client(client)
-        .build()
-        .create(ApiService::class.java)
+    .baseUrl(BASE_URL)
+    .client(client)
+    .addConverterFactory(GsonConverterFactory.create())
+    .build()
+    .create(ApiService::class.java)
 }

@@ -5,15 +5,15 @@ import retrofit2.http.POST
 import retrofit2.http.Part
 
 data class ExtractResponse(
-    val count: Int,
-    val events: List<EventDto>
+    val count: Int = 0,
+    val events: List<EventDto> = emptyList()
 )
 
 data class EventDto(
-    val date: String,
-    val type: String,
-    val description: String?,
-    val assignment: String?
+    val date: String = "",
+    val type: String = "",
+    val description: String? = null,
+    val assignment: String? = null
 )
 
 interface ApiService {
