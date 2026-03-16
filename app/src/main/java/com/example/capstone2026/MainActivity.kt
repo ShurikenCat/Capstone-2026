@@ -17,8 +17,10 @@ import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
+import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -26,6 +28,8 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
@@ -41,6 +45,8 @@ import com.kizitonwose.calendar.compose.rememberCalendarState
 import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import com.kizitonwose.calendar.core.daysOfWeek
 import kotlinx.coroutines.launch
+import java.io.File
+import java.io.FileOutputStream
 import java.text.SimpleDateFormat
 import java.time.Instant
 import java.time.LocalDate
@@ -152,6 +158,25 @@ fun AppNavGraph(
 ) {
 
     val navController = rememberNavController()
+    val context = LocalContext.current
+
+    // Load events from ICS
+    val initialEvents by remember {
+        mutableStateOf(
+            try {
+                val file = ensureWritableIcs(context)
+                val input = file.inputStream()
+                parseIcsFile(input)
+            } catch (e: Exception) {
+                e.printStackTrace()
+                emptyList()
+            }
+        )
+    }
+
+    val allEvents = remember {
+        mutableStateListOf<CalendarEvent>().apply { addAll(initialEvents) }
+    }
 
     NavHost(
         navController = navController,
@@ -165,24 +190,24 @@ fun AppNavGraph(
 
         // this is the default schedule
         composable("schedule") {
-            WeeklyScheduleScreen(navController)
+            WeeklyScheduleScreen(navController, allEvents)
         }
 
         composable("schedule_daily") {
-            DailyScheduleScreen(navController)
+            DailyScheduleScreen(navController, allEvents)
         }
 
         composable("schedule_daily/{date}") { backStackEntry ->
             val dateArg = backStackEntry.arguments?.getString("date")
-            DailyScheduleScreen(navController, dateArg)
+            DailyScheduleScreen(navController, allEvents, dateArg)
         }
 
         composable("schedule_weekly") {
-            WeeklyScheduleScreen(navController)
+            WeeklyScheduleScreen(navController, allEvents)
         }
 
         composable("schedule_monthly") {
-            MonthlyScheduleScreen(navController)
+            MonthlyScheduleScreen(navController, allEvents)
         }
 
         composable("settings") {
@@ -252,29 +277,228 @@ fun AppNavGraph(
 //}
 
 @Composable
+fun AddEventDialog(
+    selectedDate: LocalDate,
+    onDismiss: () -> Unit,
+    onSave: (CalendarEvent) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+
+    // digit input for start/end
+    var startTimeRaw by remember { mutableStateOf("") }
+    var startAmPm by remember { mutableStateOf("AM") }
+
+    var endTimeRaw by remember { mutableStateOf("") }
+    var endAmPm by remember { mutableStateOf("AM") }
+
+    val amPmOptions = listOf("AM", "PM")
+
+    fun clampMinutes(minutes: Int): Int = minutes.coerceIn(0, 59)
+
+    // Clamp hours to 1–12 (0 or >12 → 12)
+    fun clampHour12(h: Int): Int {
+        if (h <= 0) return 12
+        if (h > 12) return 12
+        return h
+    }
+
+    // Format raw digits into HH:MM with clamped hour/minute
+    fun formatWithColon(raw: String): String {
+        val digits = raw.filter { it.isDigit() }.take(4)
+        if (digits.isEmpty()) return ""
+        val padded = digits.padStart(4, '0')
+        val hRaw = padded.substring(0, 2).toInt()
+        val h = clampHour12(hRaw)
+        val mRaw = padded.substring(2, 4).toInt()
+        val m = clampMinutes(mRaw)
+        return "${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}"
+    }
+
+    // Parse raw digits + AM/PM into LocalTime
+    fun parseTime12h(raw: String, amPm: String): java.time.LocalTime {
+        val digits = raw.filter { it.isDigit() }
+        require(digits.length in 3..4)
+        val padded = digits.padStart(4, '0')
+        val h12Raw = padded.substring(0, 2).toInt()
+        val h12 = clampHour12(h12Raw)
+        val mRaw = padded.substring(2, 4).toInt()
+        val m = clampMinutes(mRaw)
+        val h24 = when {
+            h12 == 12 && amPm == "AM" -> 0
+            h12 == 12 && amPm == "PM" -> 12
+            amPm == "PM" -> h12 + 12
+            else -> h12
+        }
+        return java.time.LocalTime.of(h24, m)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Event for $selectedDate") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Event name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("Start time")
+                Row {
+                    var startFocused by remember { mutableStateOf(false) }
+                    OutlinedTextField(
+                        value = if (startFocused) startTimeRaw else formatWithColon(startTimeRaw),
+                        onValueChange = { input ->
+                            // While typing: keep only digits, up to 4 chars
+                            startTimeRaw = input.filter { it.isDigit() }.take(4)
+                        },
+                        label = { Text("HHMM") },
+                        modifier = Modifier
+                            .weight(2f)
+                            .onFocusChanged { state ->
+                                startFocused = state.isFocused
+                            }
+                    )
+
+                    Spacer(Modifier.width(8.dp))
+
+                    var startExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { startExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(startAmPm)
+                        }
+                        DropdownMenu(
+                            expanded = startExpanded,
+                            onDismissRequest = { startExpanded = false }
+                        ) {
+                            amPmOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        startAmPm = option
+                                        startExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("End time (optional)")
+                Row {
+                    var endFocused by remember { mutableStateOf(false) }
+                    OutlinedTextField(
+                        value = if (endFocused) endTimeRaw else formatWithColon(endTimeRaw),
+                        onValueChange = { input ->
+                            endTimeRaw = input.filter { it.isDigit() }.take(4)
+                        },
+                        label = { Text("HHMM") },
+                        modifier = Modifier
+                            .weight(2f)
+                            .onFocusChanged { state ->
+                                endFocused = state.isFocused
+                            }
+                    )
+
+                    Spacer(Modifier.width(8.dp))
+
+                    var endExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { endExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(endAmPm)
+                        }
+                        DropdownMenu(
+                            expanded = endExpanded,
+                            onDismissRequest = { endExpanded = false }
+                        ) {
+                            amPmOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        endAmPm = option
+                                        endExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                try {
+                    if (title.isBlank()) {
+                        onDismiss()
+                        return@TextButton
+                    }
+
+                    val zoneId = ZoneId.systemDefault()
+
+                    val startLocalTime = parseTime12h(startTimeRaw, startAmPm)
+                    val startInstant = selectedDate.atTime(startLocalTime)
+                        .atZone(zoneId)
+                        .toInstant()
+                    val startDate = Date.from(startInstant)
+
+                    val endDate = if (endTimeRaw.filter { it.isDigit() }.isNotBlank()) {
+                        val endLocalTime = parseTime12h(endTimeRaw, endAmPm)
+                        val endInstant = selectedDate.atTime(endLocalTime)
+                            .atZone(zoneId)
+                            .toInstant()
+                        Date.from(endInstant)
+                    } else {
+                        null
+                    }
+
+                    onSave(
+                        CalendarEvent(
+                            title = title,
+                            start = startDate,
+                            end = endDate
+                        )
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    onDismiss()
+                }
+            }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
 fun DailyScheduleScreen(
     navController: NavController,
+    allEvents: SnapshotStateList<CalendarEvent>,
     dateArg: String? = null
 ) {
     val context = LocalContext.current
 
-    val allEvents by remember {
-        mutableStateOf(
-            try {
-                val input = loadIcsFromAssets(context, "schedule.ics")
-                parseIcsFile(input)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                emptyList()
-            }
-        )
-    }
-
-    // If dateArg is provided, parse it; otherwise use today
     val initialDate = remember(dateArg) {
         dateArg?.let { LocalDate.parse(it) } ?: LocalDate.now()
     }
+
     var selectedDate by remember { mutableStateOf(initialDate) }
+    var showAddDialog by remember { mutableStateOf(false) }
 
     val eventsForDay = remember(selectedDate, allEvents) {
         allEvents
@@ -307,7 +531,7 @@ fun DailyScheduleScreen(
                 }
 
                 Text(
-                    text = selectedDate.toString(), // or format nicer
+                    text = selectedDate.toString(),
                     style = MaterialTheme.typography.titleMedium
                 )
 
@@ -334,7 +558,13 @@ fun DailyScheduleScreen(
                         .weight(1f)
                 ) {
                     items(eventsForDay) { event ->
-                        EventCard(event)
+                        EventCard(
+                            event = event,
+                            onDelete = {
+                                allEvents.remove(event)
+                                saveEventsToIcs(context, allEvents)
+                            }
+                        )
                     }
                 }
             }
@@ -343,34 +573,48 @@ fun DailyScheduleScreen(
         Box(
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
-            AppMenu(navController)
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                ) {
+                    Text("+")
+                }
+
+                AppMenu(navController)
+            }
+        }
+
+        if (showAddDialog) {
+            AddEventDialog(
+                selectedDate = selectedDate,
+                onDismiss = { showAddDialog = false },
+                onSave = { event ->
+                    allEvents.add(event)
+                    saveEventsToIcs(context, allEvents)
+                    val file = ensureWritableIcs(context)
+                    println("ICS content:\n" + file.readText())
+                    showAddDialog = false
+                }
+            )
         }
     }
 }
 
 @Composable
-fun WeeklyScheduleScreen(navController: NavController) {
-    val context = LocalContext.current
-
-    val events by remember {
-        mutableStateOf(
-            try {
-                val input = loadIcsFromAssets(context, "schedule.ics")
-                parseIcsFile(input)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                emptyList()
-            }
-        )
-    }
-
-    val eventsByDate = remember(events) {
-        events.groupBy { it.start.toLocalDate() }
+fun WeeklyScheduleScreen(
+    navController: NavController,
+    allEvents: List<CalendarEvent>
+) {
+    val eventsByDate = remember(allEvents) {
+        allEvents.groupBy { it.start.toLocalDate() }
     }
 
     val today = remember { LocalDate.now() }
 
-    // Choose the first day of week – here Sunday
     val firstDayOfWeek = java.time.DayOfWeek.SUNDAY
     val daysOfWeek = remember { daysOfWeek(firstDayOfWeek) }
 
@@ -486,23 +730,12 @@ fun WeeklyScheduleScreen(navController: NavController) {
 }
 
 @Composable
-fun MonthlyScheduleScreen(navController: NavController) {
-    val context = LocalContext.current
-
-    val events by remember {
-        mutableStateOf(
-            try {
-                val input = loadIcsFromAssets(context, "schedule.ics")
-                parseIcsFile(input)
-            } catch (e: Exception) {
-                e.printStackTrace()
-                emptyList()
-            }
-        )
-    }
-
-    val eventsByDate = remember(events) {
-        events.groupBy { it.start.toLocalDate() }
+fun MonthlyScheduleScreen(
+    navController: NavController,
+    allEvents: List<CalendarEvent>
+) {
+    val eventsByDate = remember(allEvents) {
+        allEvents.groupBy { it.start.toLocalDate() }
     }
 
     val currentMonth = remember { YearMonth.now() }
@@ -766,19 +999,19 @@ fun ScheduleModeSwitch(
 }
 
 @Composable
-fun EventCard(event: CalendarEvent) {
-
+fun EventCard(
+    event: CalendarEvent,
+    onDelete: (() -> Unit)? = null
+) {
     Card(
         modifier = Modifier
             .fillMaxWidth()
             .padding(vertical = 6.dp),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
-
         Column(
             modifier = Modifier.padding(12.dp)
         ) {
-
             Text(
                 text = event.title,
                 fontSize = 18.sp,
@@ -793,11 +1026,22 @@ fun EventCard(event: CalendarEvent) {
             )
 
             event.end?.let {
-
                 Text(
                     text = "End: ${formatDate(it)}",
                     fontSize = 14.sp
                 )
+            }
+
+            if (onDelete != null) {
+                Spacer(Modifier.height(8.dp))
+                TextButton(
+                    onClick = onDelete,
+                    colors = ButtonDefaults.textButtonColors(
+                        contentColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Delete")
+                }
             }
         }
     }
@@ -840,4 +1084,59 @@ fun isSameDay(d1: Date, d2: Date): Boolean {
     val c2 = Calendar.getInstance().apply { time = d2 }
     return c1.get(Calendar.YEAR) == c2.get(Calendar.YEAR) &&
             c1.get(Calendar.DAY_OF_YEAR) == c2.get(Calendar.DAY_OF_YEAR)
+}
+
+// ics file editing functions
+
+// --- ICS file helpers ---
+
+fun ensureWritableIcs(context: android.content.Context): File {
+    val dir = context.filesDir
+    val target = File(dir, "schedule.ics")
+
+    if (!target.exists()) {
+        try {
+            context.assets.open("schedule.ics").use { input ->
+                FileOutputStream(target).use { output ->
+                    input.copyTo(output)
+                }
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+            target.writeText("BEGIN:VCALENDAR\nVERSION:2.0\nEND:VCALENDAR\n")
+        }
+    }
+    return target
+}
+
+fun List<CalendarEvent>.toIcsString(): String {
+    val sb = StringBuilder()
+    sb.appendLine("BEGIN:VCALENDAR")
+    sb.appendLine("VERSION:2.0")
+
+    val fmt = SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", Locale.US)
+    fmt.timeZone = TimeZone.getTimeZone("UTC")
+
+    for ((index, event) in this.withIndex()) {
+        val cleanTitle = event.title
+            .replace("\r", " ")
+            .replace("\n", " ")
+
+        sb.appendLine("BEGIN:VEVENT")
+        sb.appendLine("UID:app-$index@capstone2026")
+        sb.appendLine("SUMMARY:$cleanTitle")
+        sb.appendLine("DTSTART:${fmt.format(event.start)}")
+        event.end?.let {
+            sb.appendLine("DTEND:${fmt.format(it)}")
+        }
+        sb.appendLine("END:VEVENT")
+    }
+
+    sb.appendLine("END:VCALENDAR")
+    return sb.toString()
+}
+
+fun saveEventsToIcs(context: android.content.Context, events: List<CalendarEvent>) {
+    val file = ensureWritableIcs(context)
+    file.writeText(events.toIcsString())
 }
