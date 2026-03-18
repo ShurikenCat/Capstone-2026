@@ -1,0 +1,7 @@
+fastapi
+uvicorn
+pdfplumber
+dateparser
+icalendar
+python-dateutil
+python-multipart
