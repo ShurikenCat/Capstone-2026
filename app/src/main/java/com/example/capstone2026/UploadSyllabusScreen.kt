@@ -27,7 +27,9 @@ import java.util.Calendar
 import java.util.Locale
 
 @Composable
-fun UploadSyllabusScreen() {
+fun UploadSyllabusScreen(
+    onImportEvents: (List<EventDto>) -> Unit
+) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
 
@@ -43,7 +45,7 @@ fun UploadSyllabusScreen() {
             try {
                 context.contentResolver.takePersistableUriPermission(
                     uri,
-                    android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION
+                    Intent.FLAG_GRANT_READ_URI_PERMISSION
                 )
             } catch (_: Exception) {
             }
@@ -60,6 +62,7 @@ fun UploadSyllabusScreen() {
 
                     val response = ApiClient.api.extractSyllabus(part)
                     events = response.events.sortedBy { it.date }
+
                     status = if (response.count > 0) {
                         "✅ Extracted ${response.count} events"
                     } else {
@@ -95,6 +98,16 @@ fun UploadSyllabusScreen() {
         Spacer(Modifier.height(16.dp))
 
         if (events.isNotEmpty()) {
+            Button(
+                onClick = { onImportEvents(events) },
+                enabled = !loading,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Import All to App Calendar")
+            }
+
+            Spacer(Modifier.height(16.dp))
+
             Text("Extracted Events", style = MaterialTheme.typography.titleMedium)
             Spacer(Modifier.height(8.dp))
 
@@ -103,7 +116,10 @@ fun UploadSyllabusScreen() {
                 modifier = Modifier.fillMaxSize()
             ) {
                 items(events.take(40)) { event ->
-                    EventCard(event = event)
+                    EventCard(
+                        event = event,
+                        onAddToAppCalendar = { onImportEvents(listOf(event)) }
+                    )
                 }
             }
         }
@@ -111,7 +127,10 @@ fun UploadSyllabusScreen() {
 }
 
 @Composable
-fun EventCard(event: EventDto) {
+fun EventCard(
+    event: EventDto,
+    onAddToAppCalendar: () -> Unit
+) {
     val context = LocalContext.current
 
     Card(
@@ -143,13 +162,64 @@ fun EventCard(event: EventDto) {
 
             if (event.date.isNotBlank()) {
                 Spacer(Modifier.height(10.dp))
-                Button(
-                    onClick = { addEventToCalendar(context, event) }
+
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
-                    Text("Add to Calendar")
+                    Button(onClick = onAddToAppCalendar) {
+                        Text("Add to App")
+                    }
+
+                    OutlinedButton(
+                        onClick = { addEventToCalendar(context, event) }
+                    ) {
+                        Text("Phone Calendar")
+                    }
                 }
             }
         }
+    }
+}
+
+fun EventDto.toCalendarEvent(): CalendarEvent? {
+    if (date.isBlank()) return null
+
+    return try {
+        val formatter = SimpleDateFormat("yyyy-MM-dd", Locale.US)
+        val parsedDate = formatter.parse(date) ?: return null
+
+        val beginCalendar = Calendar.getInstance().apply {
+            time = parsedDate
+            set(Calendar.HOUR_OF_DAY, 9)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val endCalendar = Calendar.getInstance().apply {
+            time = parsedDate
+            set(Calendar.HOUR_OF_DAY, 10)
+            set(Calendar.MINUTE, 0)
+            set(Calendar.SECOND, 0)
+            set(Calendar.MILLISECOND, 0)
+        }
+
+        val title = when (type.lowercase()) {
+            "exam" -> "Exam: ${description.orEmpty()}"
+            "quiz" -> "Quiz: ${description.orEmpty()}"
+            "assignment" -> "Assignment: ${description.orEmpty()}"
+            "project" -> "Project: ${description.orEmpty()}"
+            else -> description.orEmpty().ifBlank { "Course Event" }
+        }
+
+        CalendarEvent(
+            title = title,
+            start = beginCalendar.time,
+            end = endCalendar.time
+        )
+    } catch (e: Exception) {
+        e.printStackTrace()
+        null
     }
 }
 
