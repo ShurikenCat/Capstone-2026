@@ -767,7 +767,6 @@ fun WeeklyScheduleScreen(
     allEvents: List<CalendarEvent>
 ) {
     val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
-    val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
     val today = remember { LocalDate.now() }
 
@@ -890,7 +889,6 @@ fun MonthlyScheduleScreen(
     navController: NavController,
     allEvents: List<CalendarEvent>
 ) {
-    val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
     val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
     val currentMonth = remember { YearMonth.now() }
