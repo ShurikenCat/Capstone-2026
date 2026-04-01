@@ -53,6 +53,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.util.*
+import java.time.format.DateTimeFormatter
 
 
 
@@ -193,10 +194,33 @@ fun AppNavGraph(
     ) {
 
         composable("home") {
-            HomeScreen(navController)
+            HomeScreen(
+                allEvents = allEvents,
+                onNavigateToUpload = { navController.navigate("upload") },
+                onNavigateToDaily = { navController.navigate("schedule_daily") },
+                onNavigateToWeekly = { navController.navigate("schedule_weekly") },
+                onNavigateToMonthly = { navController.navigate("schedule_monthly") }
+            )
         }
-        composable("upload"){
-            UploadSyllabusScreen()
+        composable("upload") {
+            UploadSyllabusScreen(
+                onImportEvents = { extractedEvents ->
+                    val converted = extractedEvents.mapNotNull { it.toCalendarEvent() }
+
+                    converted.forEach { newEvent ->
+                        val alreadyExists = allEvents.any { existing ->
+                            existing.title == newEvent.title &&
+                            existing.start.time == newEvent.start.time
+                        }
+
+                        if (!alreadyExists) {
+                            allEvents.add(newEvent)
+                        }
+                    }
+
+                    saveEventsToIcs(context, allEvents)
+                }
+            )
         }
 
         // this is the default schedule
@@ -511,11 +535,9 @@ fun DailyScheduleScreen(
     var selectedDate by remember { mutableStateOf(initialDate) }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    val eventsForDay = remember(selectedDate, allEvents) {
-        allEvents
-            .filter { event -> event.start.toLocalDate() == selectedDate }
-            .sortedBy { it.start }
-    }
+    val eventsForDay = allEvents
+        .filter { event -> event.start.toLocalDate() == selectedDate}
+        .sortedBy{ it.start }
 
     Box(
         modifier = Modifier
@@ -620,9 +642,7 @@ fun WeeklyScheduleScreen(
     navController: NavController,
     allEvents: List<CalendarEvent>
 ) {
-    val eventsByDate = remember(allEvents) {
-        allEvents.groupBy { it.start.toLocalDate() }
-    }
+    val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
     val today = remember { LocalDate.now() }
 
@@ -745,9 +765,7 @@ fun MonthlyScheduleScreen(
     navController: NavController,
     allEvents: List<CalendarEvent>
 ) {
-    val eventsByDate = remember(allEvents) {
-        allEvents.groupBy { it.start.toLocalDate() }
-    }
+    val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(12) }
@@ -871,22 +889,78 @@ fun MonthlyScheduleScreen(
 }
 
 @Composable
-fun HomeScreen(navController: NavController) {
+fun HomeScreen(
+    allEvents: List<CalendarEvent>,
+    onNavigateToUpload: () -> Unit,
+    onNavigateToDaily: () -> Unit,
+    onNavigateToWeekly: () -> Unit,
+    onNavigateToMonthly: () -> Unit
+) {
+    val today = LocalDate.now()
+    val formattedDate = today.format(
+        DateTimeFormatter.ofPattern("EEEE, MMMM d")
+    )
 
-    Box(
+    val upcomingEvents = allEvents
+        .filter { it.start.toLocalDate() >= today }
+        .sortedBy { it.start }
+        .take(3)
+
+    Column(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+
+        // App title
         Text(
-            "Home Screen",
-            modifier = Modifier.align(Alignment.Center)
+            text = "ordo",
+            style = MaterialTheme.typography.headlineLarge
         )
 
-        Box(
-            modifier = Modifier.align(Alignment.BottomEnd)
-        ) {
-            AppMenu(navController)
+        // Date
+        Text(
+            text = formattedDate,
+            style = MaterialTheme.typography.bodyLarge
+        )
+
+        // Upcoming events
+        Text(
+            text = "Upcoming",
+            style = MaterialTheme.typography.titleMedium
+        )
+
+        if (upcomingEvents.isEmpty()) {
+            Text("No upcoming events")
+        } else {
+            upcomingEvents.forEach { event ->
+                Card {
+                    Column(modifier = Modifier.padding(12.dp)) {
+                        Text(event.title)
+                        Text(event.start.toString())
+                    }
+                }
+            }
+        }
+
+        Spacer(modifier = Modifier.height(12.dp))
+
+        // Navigation buttons
+        Button(onClick = onNavigateToUpload) {
+            Text("Upload Syllabus")
+        }
+
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Button(onClick = onNavigateToDaily) {
+                Text("Daily")
+            }
+            Button(onClick = onNavigateToWeekly) {
+                Text("Weekly")
+            }
+            Button(onClick = onNavigateToMonthly) {
+                Text("Monthly")
+            }
         }
     }
 }
