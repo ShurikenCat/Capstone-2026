@@ -1,5 +1,6 @@
 package com.example.capstone2026
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -14,7 +15,6 @@ import androidx.compose.foundation.shape.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
@@ -25,11 +25,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
@@ -53,17 +49,16 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.util.*
-
-private val navigation: Any
-    get() {
-        TODO()
-    }
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-
         setContent {
             val themeModeFlow = applicationContext.readThemeMode()
             val themeMode by themeModeFlow.collectAsState(initial = ThemeMode.SYSTEM)
@@ -142,7 +137,7 @@ fun AppMenu(
             contentPadding = PaddingValues(0.dp)
         ) {
             Text(
-                text = if (isExpanded) "×" else "+",
+                text = if (isExpanded) "×" else "=",
                 fontSize = 28.sp,
                 textAlign = TextAlign.Center
             )
@@ -275,7 +270,628 @@ fun AppNavGraph(
 //        }
 //    }
 //}
+@Composable
+fun AddJsonEvent(
+    dateArg: String? = null
+) {
+    val context = LocalContext.current
 
+    val initialDate = remember(dateArg) {
+        dateArg?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: LocalDate.now()
+    }
+
+    var selectedDate by remember { mutableStateOf(initialDate) }
+    var showAddDialog by remember { mutableStateOf(false) }
+
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            Spacer(Modifier.height(8.dp))
+
+            // Date header + previous/next day buttons
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+            }
+
+            Spacer(Modifier.height(8.dp))
+        }
+
+        Box(
+            modifier = Modifier.align(Alignment.BottomStart)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                ) {
+                    Text("+")
+                }
+            }
+        }
+        fun saveJsonToFile(context: Context, event: CalendarEventJson){
+            val fileName = "events.json"
+            val file = File(context.filesDir, fileName)
+            val jsonString = Json {
+                prettyPrint = true
+                ignoreUnknownKeys
+            }
+            val currentEvents: MutableList<CalendarEventJson> =
+                if(file.exists()) {
+                    try{
+                        jsonString.decodeFromString<MutableList<CalendarEventJson>>(file.readText())
+                    } catch (e: Exception) {
+                        mutableListOf()
+                    }
+                } else {
+                    mutableListOf()
+                }
+            currentEvents.add(event)
+            val updatedJson = jsonString.encodeToString(currentEvents)
+            context.openFileOutput(fileName, Context.MODE_PRIVATE).use {
+                it.write(updatedJson.toByteArray())
+            }
+        }
+        if (showAddDialog) {
+            AddEventJson(
+                selectedDate = selectedDate,
+                onDismiss = { showAddDialog = false },
+                onSave = { event ->
+                    saveJsonToFile(
+                        context = context,
+                        event = event
+                    )
+                    showAddDialog = false
+                }
+            )
+        }
+    }
+}
+
+
+@Serializable
+data class CalendarEventJson(
+    val title: String,
+    val eventType: String,
+    val inflexible: Boolean,
+    val notes: String,
+    val startDate: String,
+    val endDate: String,
+    val startTime: String,
+    val endTime: String,
+    val repeated: String? = null
+)
+
+@Composable
+fun AddEventJson(
+    selectedDate: LocalDate,
+    onDismiss: () -> Unit,
+    onSave: (CalendarEventJson) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+
+    var eventType by remember { mutableStateOf("Sleep") }
+    var inflexible by remember { mutableStateOf("True") }
+    var notes by remember { mutableStateOf("") }
+    var startDateText by remember { mutableStateOf(selectedDate.toString()) }
+    val parsedStartDate = try {
+        LocalDate.parse(startDateText)
+    } catch (e: Exception) {
+        null
+    }
+    var sameDate by remember { mutableStateOf("True") }
+    val sameOptions = listOf("True", "False")
+    var endDateText by remember { mutableStateOf(selectedDate.toString()) }
+    val parsedEndDate = try {
+        LocalDate.parse(endDateText)
+    } catch (e: Exception) {
+        null
+    }
+
+    var sun by remember { mutableStateOf(false) }
+    val sunText = if(sun) {
+        "Sun, "
+    } else {
+        ""
+    }
+    var mon by remember { mutableStateOf(false) }
+    val monText = if(mon) {
+        "Mon, "
+    } else {
+        ""
+    }
+    var tue by remember { mutableStateOf(false) }
+    val tueText = if(tue) {
+        "Tue, "
+    } else {
+        ""
+    }
+    var wed by remember { mutableStateOf(false) }
+    val wedText = if(wed) {
+        "Wed, "
+    } else {
+        ""
+    }
+    var thu by remember { mutableStateOf(false) }
+    val thuText = if(thu) {
+        "Thu, "
+    } else {
+        ""
+    }
+    var fri by remember { mutableStateOf(false) }
+    val friText = if(fri) {
+        "Fri, "
+    } else {
+        ""
+    }
+    var sat by remember { mutableStateOf(false) }
+    val satText = if(sat) {
+        "Sat, "
+    } else {
+        ""
+    }
+
+
+
+    // digit input for start/end
+    var startHr by remember { mutableStateOf("09") }
+    var startMin by remember { mutableStateOf("00") }
+    var startAmPm by remember { mutableStateOf("AM") }
+
+    var endHr by remember { mutableStateOf("05") }
+    var endMin by remember { mutableStateOf("00") }
+    var endAmPm by remember { mutableStateOf("PM") }
+
+    val inflexibleOptions = listOf("True", "False")
+    val eventOptions = listOf("Sleep", "Class", "Office Hours")
+    val amPmOptions = listOf("AM", "PM")
+    val hourOptions = (1..12).map { it.toString().padStart(2, '0') }
+    val minuteOptions = (0..59).map { it.toString().padStart(2, '0') }
+
+
+
+    fun clampMinutes(minutes: Int): Int = minutes.coerceIn(0, 59)
+
+    // Clamp hours to 1–12 (0 or >12 → 12)
+    fun clampHour12(h: Int): Int {
+        if (h <= 0) return 12
+        if (h > 12) return 12
+        return h
+    }
+
+    // Format raw digits into HH:MM with clamped hour/minute
+    fun formatWithColon(raw: String): String {
+        val digits = raw.filter { it.isDigit() }.take(4)
+        if (digits.isEmpty()) return ""
+        val padded = digits.padStart(4, '0')
+        val hRaw = padded.substring(0, 2).toInt()
+        val h = clampHour12(hRaw)
+        val mRaw = padded.substring(2, 4).toInt()
+        val m = clampMinutes(mRaw)
+        return "${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}"
+    }
+
+    // Parse raw digits + AM/PM into LocalTime
+    fun parseTime12h(hrStr: String, minStr: String, amPm: String): java.time.LocalTime {
+        val h12 = hrStr.toInt()
+        val m = minStr.toInt()
+        val h24 = when {
+            h12 == 12 && amPm == "AM" -> 0
+            h12 == 12 && amPm == "PM" -> 12
+            amPm == "PM" -> h12 + 12
+            else -> h12
+        }
+        return java.time.LocalTime.of(h24, m)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Event") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Event name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = startDateText,
+                    onValueChange = {
+                        startDateText = it
+                    },
+                    label = { Text("Start Date (yyyy-MM-dd)") },
+                    isError = parsedStartDate == null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("Is the end date the same as the start date?")
+                Row{
+                    var sameDateExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { sameDateExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(sameDate)
+                        }
+                        DropdownMenu(
+                            expanded = sameDateExpanded,
+                            onDismissRequest = { sameDateExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            sameOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        sameDate = option
+                                        sameDateExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = endDateText,
+                    onValueChange = {
+                        endDateText = it
+                    },
+                    label = { Text("End Date (yyyy-MM-dd)") },
+                    isError = parsedEndDate == null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(12.dp))
+                Text("Repeated?")
+                Text("(Sun,    Mon,   Tue,    Wed,   Thu,    Fri,    Sat)")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = sun,
+                        onCheckedChange = { sun = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = mon,
+                        onCheckedChange = { mon = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = tue,
+                        onCheckedChange = { tue = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = wed,
+                        onCheckedChange = { wed = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = thu,
+                        onCheckedChange = { thu = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = fri,
+                        onCheckedChange = { fri = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = sat,
+                        onCheckedChange = { sat = it }
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("Event Type, Inflexible?")
+                Row {
+                    var eventTypeExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { eventTypeExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(eventType)
+                        }
+                        DropdownMenu(
+                            expanded = eventTypeExpanded,
+                            onDismissRequest = { eventTypeExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            eventOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        eventType = option
+                                        eventTypeExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    var inflexibleExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { inflexibleExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(inflexible)
+                        }
+                        DropdownMenu(
+                            expanded = inflexibleExpanded,
+                            onDismissRequest = { inflexibleExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            inflexibleOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        inflexible = option
+                                        inflexibleExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("Start time")
+                Row {
+                    var hourExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { hourExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(startHr)
+                        }
+                        DropdownMenu(
+                            expanded = hourExpanded,
+                            onDismissRequest = { hourExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            hourOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        startHr = option
+                                        hourExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    var minuteExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { minuteExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(startMin)
+                        }
+                        DropdownMenu(
+                            expanded = minuteExpanded,
+                            onDismissRequest = { minuteExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            minuteOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        startMin = option
+                                        minuteExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    var startExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { startExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(startAmPm)
+                        }
+                        DropdownMenu(
+                            expanded = startExpanded,
+                            onDismissRequest = { startExpanded = false }
+                        ) {
+                            amPmOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        startAmPm = option
+                                        startExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("End time")
+                Row {
+                    var hourExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { hourExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(endHr)
+                        }
+                        DropdownMenu(
+                            expanded = hourExpanded,
+                            onDismissRequest = { hourExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            hourOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        endHr = option
+                                        hourExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    var minuteExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { minuteExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(endMin)
+                        }
+                        DropdownMenu(
+                            expanded = minuteExpanded,
+                            onDismissRequest = { minuteExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            minuteOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        endMin = option
+                                        minuteExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    var endExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { endExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(endAmPm)
+                        }
+                        DropdownMenu(
+                            expanded = endExpanded,
+                            onDismissRequest = { endExpanded = false }
+                        ) {
+                            amPmOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        endAmPm = option
+                                        endExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                try {
+                    if (title.isBlank()) {
+                        onDismiss()
+                        return@TextButton
+                    }
+                    if (parsedStartDate == null) {
+                        onDismiss()
+                        return@TextButton
+                    }
+                    if (parsedEndDate == null && sameDate != "True") {
+                        onDismiss()
+                        return@TextButton
+                    }
+                    val repeated = sunText + monText + tueText + wedText + thuText + friText + satText
+
+                    val jsonEvent = CalendarEventJson(
+                        title = title,
+                        eventType = eventType,
+                        inflexible = inflexible == "True",
+                        notes = notes,
+                        startDate = startDateText,
+                        endDate = if (sameDate == "True") startDateText else endDateText,
+                        startTime = "$startHr:$startMin $startAmPm",
+                        endTime = "$endHr:$endMin $endAmPm",
+                        repeated = if(repeated == "") {
+                            null
+                        } else {
+                            repeated
+                        }
+                    )
+
+                    onSave(
+                        jsonEvent
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    onDismiss()
+                }
+            }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
 @Composable
 fun AddEventDialog(
     selectedDate: LocalDate,
@@ -587,16 +1203,24 @@ fun DailyScheduleScreen(
                 AppMenu(navController)
             }
         }
-
+        fun saveJsonToFile(context: Context, fileName: String, event: CalendarEventJson){
+            val jsonString = Json {
+                prettyPrint = true
+            }.encodeToString(event)
+            context.openFileOutput(fileName, Context.MODE_PRIVATE).use {stream ->
+                stream.write(jsonString.toByteArray())
+            }
+        }
         if (showAddDialog) {
-            AddEventDialog(
+            AddEventJson(
                 selectedDate = selectedDate,
                 onDismiss = { showAddDialog = false },
                 onSave = { event ->
-                    allEvents.add(event)
-                    saveEventsToIcs(context, allEvents)
-                    val file = ensureWritableIcs(context)
-                    println("ICS content:\n" + file.readText())
+                    saveJsonToFile(
+                        context = context,
+                        fileName = "events_${System.currentTimeMillis()}.json}",
+                        event = event
+                    )
                     showAddDialog = false
                 }
             )
@@ -861,7 +1485,7 @@ fun MonthlyScheduleScreen(
 
 @Composable
 fun HomeScreen(navController: NavController) {
-
+    var t = true
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -871,7 +1495,11 @@ fun HomeScreen(navController: NavController) {
             "Home Screen",
             modifier = Modifier.align(Alignment.Center)
         )
-
+        Box(
+            modifier = Modifier.align(Alignment.BottomStart)
+        ) {
+            AddJsonEvent()
+        }
         Box(
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
