@@ -41,6 +41,8 @@ import com.kizitonwose.calendar.compose.rememberCalendarState
 import com.kizitonwose.calendar.compose.weekcalendar.rememberWeekCalendarState
 import com.kizitonwose.calendar.core.daysOfWeek
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
+import kotlinx.serialization.json.Json
 import java.io.File
 import java.io.FileOutputStream
 import java.text.SimpleDateFormat
@@ -100,6 +102,17 @@ fun AppMenu(
         AnimatedVisibility(visible = isExpanded) {
             SpeedDialItem("Home") {
                 navController.navigate("home") {
+                    launchSingleTop = true
+                }
+                isExpanded = false
+            }
+        }
+
+        Spacer(Modifier.height(12.dp))
+
+        AnimatedVisibility(visible = isExpanded) {
+            SpeedDialItem("Upload") {
+                navController.navigate("upload"){
                     launchSingleTop = true
                 }
                 isExpanded = false
@@ -180,7 +193,33 @@ fun AppNavGraph(
     ) {
 
         composable("home") {
-            HomeScreen(navController)
+            HomeScreen(
+                allEvents = allEvents,
+                onNavigateToUpload = { navController.navigate("upload") },
+                onNavigateToDaily = { navController.navigate("schedule_daily") },
+                onNavigateToWeekly = { navController.navigate("schedule_weekly") },
+                onNavigateToMonthly = { navController.navigate("schedule_monthly") }
+            )
+        }
+        composable("upload") {
+            UploadSyllabusScreen(
+                onImportEvents = { extractedEvents ->
+                    val converted = extractedEvents.mapNotNull { it.toCalendarEvent() }
+
+                    converted.forEach { newEvent ->
+                        val alreadyExists = allEvents.any { existing ->
+                            existing.title == newEvent.title &&
+                            existing.start.time == newEvent.start.time
+                        }
+
+                        if (!alreadyExists) {
+                            allEvents.add(newEvent)
+                        }
+                    }
+
+                    saveEventsToIcs(context, allEvents)
+                }
+            )
         }
 
         // this is the default schedule
@@ -893,21 +932,194 @@ fun AddEventJson(
     )
 }
 @Composable
-fun AddEventDialog(
+fun AddJsonEvent(
+    dateArg: String? = null
+) {
+    val context = LocalContext.current
+
+    val initialDate = remember(dateArg) {
+        dateArg?.let { runCatching { LocalDate.parse(it) }.getOrNull() } ?: LocalDate.now()
+    }
+
+    var selectedDate by remember { mutableStateOf(initialDate) }
+    var showAddDialog by remember { mutableStateOf(false) }
+
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
+        Column(modifier = Modifier.fillMaxSize()) {
+
+            Spacer(Modifier.height(8.dp))
+
+            // Date header + previous/next day buttons
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+            }
+
+            Spacer(Modifier.height(8.dp))
+        }
+
+        Box(
+            modifier = Modifier.align(Alignment.BottomStart)
+        ) {
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                FloatingActionButton(
+                    onClick = { showAddDialog = true },
+                    modifier = Modifier
+                        .padding(bottom = 8.dp)
+                ) {
+                    Text("+")
+                }
+            }
+        }
+        fun saveJsonToFile(context: Context, event: CalendarEventJson){
+            val fileName = "events.json"
+            val file = File(context.filesDir, fileName)
+            val jsonString = Json {
+                prettyPrint = true
+                ignoreUnknownKeys
+            }
+            val currentEvents: MutableList<CalendarEventJson> =
+                if(file.exists()) {
+                    try{
+                        jsonString.decodeFromString<MutableList<CalendarEventJson>>(file.readText())
+                    } catch (e: Exception) {
+                        mutableListOf()
+                    }
+                } else {
+                    mutableListOf()
+                }
+            currentEvents.add(event)
+            val updatedJson = jsonString.encodeToString(currentEvents)
+            context.openFileOutput(fileName, Context.MODE_PRIVATE).use {
+                it.write(updatedJson.toByteArray())
+            }
+        }
+        if (showAddDialog) {
+            AddEventJson(
+                selectedDate = selectedDate,
+                onDismiss = { showAddDialog = false },
+                onSave = { event ->
+                    saveJsonToFile(
+                        context = context,
+                        event = event
+                    )
+                    showAddDialog = false
+                }
+            )
+        }
+    }
+}
+
+
+@Serializable
+data class CalendarEventJson(
+    val title: String,
+    val eventType: String,
+    val inflexible: Boolean,
+    val notes: String,
+    val startDate: String,
+    val endDate: String,
+    val startTime: String,
+    val endTime: String,
+    val repeated: String? = null
+)
+
+@Composable
+fun AddEventJson(
     selectedDate: LocalDate,
     onDismiss: () -> Unit,
-    onSave: (CalendarEvent) -> Unit
+    onSave: (CalendarEventJson) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
 
+    var eventType by remember { mutableStateOf("Sleep") }
+    var inflexible by remember { mutableStateOf("True") }
+    var notes by remember { mutableStateOf("") }
+    var startDateText by remember { mutableStateOf(selectedDate.toString()) }
+    val parsedStartDate = try {
+        LocalDate.parse(startDateText)
+    } catch (e: Exception) {
+        null
+    }
+    var sameDate by remember { mutableStateOf("True") }
+    val sameOptions = listOf("True", "False")
+    var endDateText by remember { mutableStateOf(selectedDate.toString()) }
+    val parsedEndDate = try {
+        LocalDate.parse(endDateText)
+    } catch (e: Exception) {
+        null
+    }
+
+    var sun by remember { mutableStateOf(false) }
+    val sunText = if(sun) {
+        "Sun, "
+    } else {
+        ""
+    }
+    var mon by remember { mutableStateOf(false) }
+    val monText = if(mon) {
+        "Mon, "
+    } else {
+        ""
+    }
+    var tue by remember { mutableStateOf(false) }
+    val tueText = if(tue) {
+        "Tue, "
+    } else {
+        ""
+    }
+    var wed by remember { mutableStateOf(false) }
+    val wedText = if(wed) {
+        "Wed, "
+    } else {
+        ""
+    }
+    var thu by remember { mutableStateOf(false) }
+    val thuText = if(thu) {
+        "Thu, "
+    } else {
+        ""
+    }
+    var fri by remember { mutableStateOf(false) }
+    val friText = if(fri) {
+        "Fri, "
+    } else {
+        ""
+    }
+    var sat by remember { mutableStateOf(false) }
+    val satText = if(sat) {
+        "Sat, "
+    } else {
+        ""
+    }
+
+
+
     // digit input for start/end
-    var startTimeRaw by remember { mutableStateOf("") }
+    var startHr by remember { mutableStateOf("09") }
+    var startMin by remember { mutableStateOf("00") }
     var startAmPm by remember { mutableStateOf("AM") }
 
-    var endTimeRaw by remember { mutableStateOf("") }
-    var endAmPm by remember { mutableStateOf("AM") }
+    var endHr by remember { mutableStateOf("05") }
+    var endMin by remember { mutableStateOf("00") }
+    var endAmPm by remember { mutableStateOf("PM") }
 
+    val inflexibleOptions = listOf("True", "False")
+    val eventOptions = listOf("Sleep", "Class", "Office Hours")
     val amPmOptions = listOf("AM", "PM")
+    val hourOptions = (1..12).map { it.toString().padStart(2, '0') }
+    val minuteOptions = (0..59).map { it.toString().padStart(2, '0') }
+
+
 
     fun clampMinutes(minutes: Int): Int = minutes.coerceIn(0, 59)
 
@@ -931,6 +1143,461 @@ fun AddEventDialog(
     }
 
     // Parse raw digits + AM/PM into LocalTime
+    fun parseTime12h(hrStr: String, minStr: String, amPm: String): java.time.LocalTime {
+        val h12 = hrStr.toInt()
+        val m = minStr.toInt()
+        val h24 = when {
+            h12 == 12 && amPm == "AM" -> 0
+            h12 == 12 && amPm == "PM" -> 12
+            amPm == "PM" -> h12 + 12
+            else -> h12
+        }
+        return java.time.LocalTime.of(h24, m)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add Event") },
+        text = {
+            Column {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Event name") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = startDateText,
+                    onValueChange = {
+                        startDateText = it
+                    },
+                    label = { Text("Start Date (yyyy-MM-dd)") },
+                    isError = parsedStartDate == null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("Is the end date the same as the start date?")
+                Row{
+                    var sameDateExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { sameDateExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(sameDate)
+                        }
+                        DropdownMenu(
+                            expanded = sameDateExpanded,
+                            onDismissRequest = { sameDateExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            sameOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        sameDate = option
+                                        sameDateExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+                Spacer(Modifier.height(12.dp))
+
+                OutlinedTextField(
+                    value = endDateText,
+                    onValueChange = {
+                        endDateText = it
+                    },
+                    label = { Text("End Date (yyyy-MM-dd)") },
+                    isError = parsedEndDate == null,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(12.dp))
+                Text("Repeated?")
+                Text("(Sun,    Mon,   Tue,    Wed,   Thu,    Fri,    Sat)")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = sun,
+                        onCheckedChange = { sun = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = mon,
+                        onCheckedChange = { mon = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = tue,
+                        onCheckedChange = { tue = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = wed,
+                        onCheckedChange = { wed = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = thu,
+                        onCheckedChange = { thu = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = fri,
+                        onCheckedChange = { fri = it }
+                    )
+                    Checkbox(
+                        modifier = Modifier.width((40.dp)),
+                        checked = sat,
+                        onCheckedChange = { sat = it }
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("Event Type, Inflexible?")
+                Row {
+                    var eventTypeExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { eventTypeExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(eventType)
+                        }
+                        DropdownMenu(
+                            expanded = eventTypeExpanded,
+                            onDismissRequest = { eventTypeExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            eventOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        eventType = option
+                                        eventTypeExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+
+                    var inflexibleExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { inflexibleExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(inflexible)
+                        }
+                        DropdownMenu(
+                            expanded = inflexibleExpanded,
+                            onDismissRequest = { inflexibleExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            inflexibleOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        inflexible = option
+                                        inflexibleExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("Start time")
+                Row {
+                    var hourExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { hourExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(startHr)
+                        }
+                        DropdownMenu(
+                            expanded = hourExpanded,
+                            onDismissRequest = { hourExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            hourOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        startHr = option
+                                        hourExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    var minuteExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { minuteExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(startMin)
+                        }
+                        DropdownMenu(
+                            expanded = minuteExpanded,
+                            onDismissRequest = { minuteExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            minuteOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        startMin = option
+                                        minuteExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    var startExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { startExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(startAmPm)
+                        }
+                        DropdownMenu(
+                            expanded = startExpanded,
+                            onDismissRequest = { startExpanded = false }
+                        ) {
+                            amPmOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        startAmPm = option
+                                        startExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.height(12.dp))
+
+                Text("End time")
+                Row {
+                    var hourExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { hourExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(endHr)
+                        }
+                        DropdownMenu(
+                            expanded = hourExpanded,
+                            onDismissRequest = { hourExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            hourOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        endHr = option
+                                        hourExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    var minuteExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { minuteExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(endMin)
+                        }
+                        DropdownMenu(
+                            expanded = minuteExpanded,
+                            onDismissRequest = { minuteExpanded = false },
+                            modifier = Modifier
+                                .requiredSizeIn(maxHeight = 200.dp)
+                        ) {
+                            minuteOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        endMin = option
+                                        minuteExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.width(8.dp))
+
+                    var endExpanded by remember { mutableStateOf(false) }
+                    Box(modifier = Modifier.weight(1f)) {
+                        OutlinedButton(
+                            onClick = { endExpanded = true },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(endAmPm)
+                        }
+                        DropdownMenu(
+                            expanded = endExpanded,
+                            onDismissRequest = { endExpanded = false }
+                        ) {
+                            amPmOptions.forEach { option ->
+                                DropdownMenuItem(
+                                    text = { Text(option) },
+                                    onClick = {
+                                        endAmPm = option
+                                        endExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.width(8.dp))
+
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes") },
+                    modifier = Modifier.fillMaxWidth(),
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = {
+                try {
+                    if (title.isBlank()) {
+                        onDismiss()
+                        return@TextButton
+                    }
+                    if (parsedStartDate == null) {
+                        onDismiss()
+                        return@TextButton
+                    }
+                    if (parsedEndDate == null && sameDate != "True") {
+                        onDismiss()
+                        return@TextButton
+                    }
+                    val repeated = sunText + monText + tueText + wedText + thuText + friText + satText
+
+                    val jsonEvent = CalendarEventJson(
+                        title = title,
+                        eventType = eventType,
+                        inflexible = inflexible == "True",
+                        notes = notes,
+                        startDate = startDateText,
+                        endDate = if (sameDate == "True") startDateText else endDateText,
+                        startTime = "$startHr:$startMin $startAmPm",
+                        endTime = "$endHr:$endMin $endAmPm",
+                        repeated = if(repeated == "") {
+                            null
+                        } else {
+                            repeated
+                        }
+                    )
+
+                    onSave(
+                        jsonEvent
+                    )
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    onDismiss()
+                }
+            }) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+enum class EventMode { SINGLE_DAY, REPEATING }
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun AddEventDialog(
+    selectedDate: LocalDate,
+    onDismiss: () -> Unit,
+    onSave: (List<CalendarEvent>) -> Unit
+) {
+    var title by remember { mutableStateOf("") }
+
+    var startTimeRaw by remember { mutableStateOf("") }
+    var startAmPm by remember { mutableStateOf("AM") }
+
+    var endTimeRaw by remember { mutableStateOf("") }
+    var endAmPm by remember { mutableStateOf("AM") }
+
+    val amPmOptions = listOf("AM", "PM")
+
+    var mode by remember { mutableStateOf(EventMode.SINGLE_DAY) }
+    val allDays = remember { java.time.DayOfWeek.values().toList() }
+    var repeatDayOfWeek by remember { mutableStateOf(selectedDate.dayOfWeek) }
+    var repeatEndDate by remember { mutableStateOf(selectedDate.plusWeeks(4)) }
+    var showEndDatePicker by remember { mutableStateOf(false) }
+
+    fun clampMinutes(minutes: Int): Int = minutes.coerceIn(0, 59)
+
+    fun clampHour12(h: Int): Int {
+        if (h <= 0) return 12
+        if (h > 12) return 12
+        return h
+    }
+
+    fun formatWithColon(raw: String): String {
+        val digits = raw.filter { it.isDigit() }.take(4)
+        if (digits.isEmpty()) return ""
+        val padded = digits.padStart(4, '0')
+        val hRaw = padded.substring(0, 2).toInt()
+        val h = clampHour12(hRaw)
+        val mRaw = padded.substring(2, 4).toInt()
+        val m = clampMinutes(mRaw)
+        return "${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}"
+    }
+
     fun parseTime12h(raw: String, amPm: String): java.time.LocalTime {
         val digits = raw.filter { it.isDigit() }
         require(digits.length in 3..4)
@@ -962,13 +1629,30 @@ fun AddEventDialog(
 
                 Spacer(Modifier.height(12.dp))
 
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Mode:")
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = mode == EventMode.SINGLE_DAY,
+                        onClick = { mode = EventMode.SINGLE_DAY },
+                        label = { Text("Single day") }
+                    )
+                    Spacer(Modifier.width(8.dp))
+                    FilterChip(
+                        selected = mode == EventMode.REPEATING,
+                        onClick = { mode = EventMode.REPEATING },
+                        label = { Text("Weekly repeat") }
+                    )
+                }
+
+                Spacer(Modifier.height(12.dp))
+
                 Text("Start time")
                 Row {
                     var startFocused by remember { mutableStateOf(false) }
                     OutlinedTextField(
                         value = if (startFocused) startTimeRaw else formatWithColon(startTimeRaw),
                         onValueChange = { input ->
-                            // While typing: keep only digits, up to 4 chars
                             startTimeRaw = input.filter { it.isDigit() }.take(4)
                         },
                         label = { Text("HHMM") },
@@ -1050,6 +1734,83 @@ fun AddEventDialog(
                         }
                     }
                 }
+
+                if (mode == EventMode.REPEATING) {
+                    Spacer(Modifier.height(16.dp))
+                    Text("Repeats every week on")
+
+                    var dayExpanded by remember { mutableStateOf(false) }
+                    Box {
+                        OutlinedButton(onClick = { dayExpanded = true }) {
+                            Text(
+                                repeatDayOfWeek.name.lowercase()
+                                    .replaceFirstChar { it.uppercase() }
+                            )
+                        }
+                        DropdownMenu(
+                            expanded = dayExpanded,
+                            onDismissRequest = { dayExpanded = false }
+                        ) {
+                            allDays.forEach { dow ->
+                                DropdownMenuItem(
+                                    text = {
+                                        Text(
+                                            dow.name.lowercase()
+                                                .replaceFirstChar { it.uppercase() }
+                                        )
+                                    },
+                                    onClick = {
+                                        repeatDayOfWeek = dow
+                                        dayExpanded = false
+                                    }
+                                )
+                            }
+                        }
+                    }
+
+                    Spacer(Modifier.height(12.dp))
+                    Text("Repeat until")
+
+                    OutlinedButton(onClick = { showEndDatePicker = true }) {
+                        Text(repeatEndDate.toString())
+                    }
+
+                    if (showEndDatePicker) {
+                        val datePickerState = rememberDatePickerState(
+                            initialSelectedDateMillis = repeatEndDate
+                                .atStartOfDay(ZoneId.systemDefault())
+                                .toInstant()
+                                .toEpochMilli()
+                        )
+
+                        DatePickerDialog(
+                            onDismissRequest = { showEndDatePicker = false },
+                            confirmButton = {
+                                TextButton(
+                                    onClick = {
+                                        val millis = datePickerState.selectedDateMillis
+                                        if (millis != null) {
+                                            val localDate = Instant.ofEpochMilli(millis)
+                                                .atZone(ZoneId.systemDefault())
+                                                .toLocalDate()
+                                            repeatEndDate = localDate
+                                        }
+                                        showEndDatePicker = false
+                                    }
+                                ) {
+                                    Text("OK")
+                                }
+                            },
+                            dismissButton = {
+                                TextButton(onClick = { showEndDatePicker = false }) {
+                                    Text("Cancel")
+                                }
+                            }
+                        ) {
+                            DatePicker(state = datePickerState)
+                        }
+                    }
+                }
             }
         },
         confirmButton = {
@@ -1063,30 +1824,55 @@ fun AddEventDialog(
                     val zoneId = ZoneId.systemDefault()
 
                     val startLocalTime = parseTime12h(startTimeRaw, startAmPm)
-                    val startInstant = selectedDate.atTime(startLocalTime)
-                        .atZone(zoneId)
-                        .toInstant()
-                    val startDate = Date.from(startInstant)
+                    val endLocalTime =
+                        if (endTimeRaw.filter { it.isDigit() }.isNotBlank())
+                            parseTime12h(endTimeRaw, endAmPm)
+                        else null
 
-                    val endDate = if (endTimeRaw.filter { it.isDigit() }.isNotBlank()) {
-                        val endLocalTime = parseTime12h(endTimeRaw, endAmPm)
-                        val endInstant = selectedDate.atTime(endLocalTime)
+                    // Helper to build one CalendarEvent for a given LocalDate
+                    fun buildEventForDate(date: LocalDate): CalendarEvent {
+                        val startInstant = date.atTime(startLocalTime)
                             .atZone(zoneId)
                             .toInstant()
-                        Date.from(endInstant)
-                    } else {
-                        null
-                    }
+                        val startDate = Date.from(startInstant)
 
-                    onSave(
-                        CalendarEvent(
+                        val endDate = endLocalTime?.let { lt ->
+                            val endInstant = date.atTime(lt)
+                                .atZone(zoneId)
+                                .toInstant()
+                            Date.from(endInstant)
+                        }
+
+                        return CalendarEvent(
                             title = title,
                             start = startDate,
                             end = endDate
                         )
-                    )
+                    }
+
+                    val events: List<CalendarEvent> =
+                        if (mode == EventMode.SINGLE_DAY) {
+                            listOf(buildEventForDate(selectedDate))
+                        } else {
+                            val results = mutableListOf<CalendarEvent>()
+
+                            var current = selectedDate
+                            while (current.dayOfWeek != repeatDayOfWeek) {
+                                current = current.plusDays(1)
+                            }
+
+                            while (!current.isAfter(repeatEndDate)) {
+                                results.add(buildEventForDate(current))
+                                current = current.plusWeeks(1)
+                            }
+
+                            results
+                        }
+
+                    onSave(events)
                 } catch (e: Exception) {
                     e.printStackTrace()
+                } finally {
                     onDismiss()
                 }
             }) {
@@ -1116,11 +1902,10 @@ fun DailyScheduleScreen(
     var selectedDate by remember { mutableStateOf(initialDate) }
     var showAddDialog by remember { mutableStateOf(false) }
 
-    val eventsForDay = remember(selectedDate, allEvents) {
+    val eventsForDay =
         allEvents
             .filter { event -> event.start.toLocalDate() == selectedDate }
             .sortedBy { it.start }
-    }
 
     Box(
         modifier = Modifier
@@ -1136,7 +1921,6 @@ fun DailyScheduleScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            // Date header + previous/next day buttons
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -1233,9 +2017,7 @@ fun WeeklyScheduleScreen(
     navController: NavController,
     allEvents: List<CalendarEvent>
 ) {
-    val eventsByDate = remember(allEvents) {
-        allEvents.groupBy { it.start.toLocalDate() }
-    }
+    val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
     val today = remember { LocalDate.now() }
 
@@ -1358,9 +2140,7 @@ fun MonthlyScheduleScreen(
     navController: NavController,
     allEvents: List<CalendarEvent>
 ) {
-    val eventsByDate = remember(allEvents) {
-        allEvents.groupBy { it.start.toLocalDate() }
-    }
+    val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
     val currentMonth = remember { YearMonth.now() }
     val startMonth = remember { currentMonth.minusMonths(12) }
@@ -1489,11 +2269,14 @@ fun HomeScreen(navController: NavController) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(24.dp)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
     ) {
+
+        // App title
         Text(
-            "Home Screen",
-            modifier = Modifier.align(Alignment.Center)
+            text = "ordo",
+            style = MaterialTheme.typography.headlineLarge
         )
         Box(
             modifier = Modifier.align(Alignment.BottomStart)
@@ -1699,8 +2482,17 @@ fun formatDate(date: Date): String {
 data class CalendarEvent(
     val title: String,
     val start: Date,
-    val end: Date?
+    val end: Date? = null,
+    val repeatRule: RepeatRule? = null
 )
+
+data class RepeatRule(
+    val frequency: RepeatFrequency,
+    val dayOfWeek: java.time.DayOfWeek,
+    val until: LocalDate
+)
+
+enum class RepeatFrequency { WEEKLY }
 
 fun Date.toLocalDate(): LocalDate =
     Instant.ofEpochMilli(time)
