@@ -1700,14 +1700,9 @@ fun HomeScreen(
         Spacer(modifier = Modifier.height(12.dp))
 
         // Navigation buttons
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), ){
             Button(onClick = onNavigateToUpload) {
                 Text("Upload Syllabus")
             }
-            Box() {
-                AddJsonEvent()
-            }
-        }
 
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -1721,6 +1716,8 @@ fun HomeScreen(
                 Text("Monthly")
             }
         }
+
+        AddJsonEvent()
     }
 }
 
