@@ -36,6 +36,7 @@ fun UploadSyllabusScreen(
     var status by remember { mutableStateOf("Pick a PDF syllabus to extract events.") }
     var loading by remember { mutableStateOf(false) }
     var events by remember { mutableStateOf<List<EventDto>>(emptyList()) }
+    var extractionSource by remember { mutableStateOf<String?>(null) }
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -54,6 +55,7 @@ fun UploadSyllabusScreen(
                 loading = true
                 status = "Uploading syllabus..."
                 events = emptyList()
+                extractionSource = null
 
                 try {
                     val pdfBytes = readBytes(context, uri)
@@ -62,6 +64,7 @@ fun UploadSyllabusScreen(
 
                     val response = ApiClient.api.extractSyllabus(part)
                     events = response.events.sortedBy { it.date }
+                    extractionSource = response.source
 
                     status = if (response.count > 0) {
                         "✅ Extracted ${response.count} events"
@@ -86,6 +89,21 @@ fun UploadSyllabusScreen(
         Text("Upload Syllabus", style = MaterialTheme.typography.headlineSmall)
         Spacer(Modifier.height(8.dp))
         Text(status)
+        extractionSource?.let { source ->
+    val sourceLabel = when (source) {
+        "rules" -> "Rule-based extraction"
+        "ai" -> "AI extraction"
+        "rules_fallback" -> "Rule-based fallback"
+        else -> "Unknown extraction source"
+    }
+
+    Text(
+        text = "Method: $sourceLabel",
+        style = MaterialTheme.typography.bodyMedium
+    )
+
+    Spacer(Modifier.height(12.dp))
+}
         Spacer(Modifier.height(12.dp))
 
         Button(

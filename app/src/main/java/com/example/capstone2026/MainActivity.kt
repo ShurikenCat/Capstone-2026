@@ -57,10 +57,12 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.util.*
-import java.time.format.DateTimeFormatter
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.buildJsonObject
+import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 import java.time.DayOfWeek
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -205,12 +207,13 @@ fun AppNavGraph(
 
         composable("home") {
             HomeScreen(
-                allEvents = allEvents,
-                onNavigateToUpload = { navController.navigate("upload") },
-                onNavigateToDaily = { navController.navigate("schedule_daily") },
-                onNavigateToWeekly = { navController.navigate("schedule_weekly") },
-                onNavigateToMonthly = { navController.navigate("schedule_monthly") },
-                onNavigateToSettings = { navController.navigate("settings")}
+            allEvents = allEvents,
+            onNavigateToUpload = { navController.navigate("upload") },
+            onNavigateToDaily = { navController.navigate("schedule_daily") },
+            onNavigateToWeekly = { navController.navigate("schedule_weekly") },
+            onNavigateToMonthly = { navController.navigate("schedule_monthly") },
+            onNavigateToSettings = { navController.navigate("settings")},
+            navController = navController
             )
         }
         composable("upload") {
@@ -321,7 +324,6 @@ fun AppNavGraph(
 //        }
 //    }
 //}
-
 @Composable
 fun AddJsonEvent(
     allEvents: SnapshotStateList<CalendarEvent>,
@@ -354,7 +356,7 @@ fun AddJsonEvent(
         }
 
         Box(
-            modifier = Modifier.align(Alignment.BottomEnd)
+            modifier = Modifier.align(Alignment.BottomStart)
         ) {
             Column(
                 horizontalAlignment = Alignment.End
@@ -1387,6 +1389,7 @@ fun HomeScreen(
     onNavigateToWeekly: () -> Unit,
     onNavigateToMonthly: () -> Unit,
     onNavigateToSettings: () -> Unit
+    navController: NavController
 ) {
     val today = LocalDate.now()
     val formattedDate = today.format(
@@ -1398,13 +1401,22 @@ fun HomeScreen(
         .filter { it.start.toLocalDate() >= today }
         .sortedBy { it.start }
         .take(3)
-    Box() {
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(16.dp)
+    ) {
         Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxSize(),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "App Logo",
+                modifier = Modifier
+                .height(80.dp)
+            )
 
             // App title
             Text(
@@ -1418,7 +1430,6 @@ fun HomeScreen(
                 style = MaterialTheme.typography.bodyLarge
             )
 
-            // Upcoming events
             Text(
                 text = "Upcoming",
                 style = MaterialTheme.typography.titleMedium
@@ -1428,7 +1439,9 @@ fun HomeScreen(
                 Text("No upcoming events")
             } else {
                 upcomingEvents.forEach { event ->
-                    Card {
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
                         Column(modifier = Modifier.padding(12.dp)) {
 //                            val formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
 //                            val dateTime = LocalDateTime.parse(event.start.toString(), formatter)
@@ -1452,7 +1465,10 @@ fun HomeScreen(
 
             // Navigation buttons
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)){
-                Button(onClick = onNavigateToUpload) {
+                Button(
+                    onClick = onNavigateToUpload,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     Text("Upload Syllabus")
                 }
                 Button(onClick = onNavigateToSettings) {
@@ -1460,26 +1476,45 @@ fun HomeScreen(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = onNavigateToDaily) {
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Button(
+                    onClick = onNavigateToDaily,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text("Daily")
                 }
-                Button(onClick = onNavigateToWeekly) {
+
+                Button(
+                    onClick = onNavigateToWeekly,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text("Weekly")
                 }
-                Button(onClick = onNavigateToMonthly) {
+
+                Button(
+                    onClick = onNavigateToMonthly,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text("Monthly")
                 }
             }
         }
-        Box(modifier = Modifier
-            .align(Alignment.BottomEnd)
-            .padding(16.dp)) {
-            AddJsonEvent(allEvents)
+
+        Box(
+            modifier = Modifier.align(Alignment.BottomStart)
+        ) {
+            AddJsonEvent()
         }
 
+        Box(
+            modifier = Modifier.align(Alignment.BottomEnd)
+        ) {
+            AppMenu(navController)
+        }
     }
-
 }
 
 @Composable
