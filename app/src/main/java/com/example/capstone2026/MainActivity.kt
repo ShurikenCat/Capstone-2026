@@ -1,6 +1,7 @@
 package com.example.capstone2026
 
 import android.content.Context
+import android.graphics.Paint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -19,7 +20,6 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
@@ -62,7 +62,9 @@ import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.buildJsonObject
 import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.Image
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.LineHeightStyle
 import java.time.DayOfWeek
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
@@ -212,7 +214,7 @@ fun AppNavGraph(
             onNavigateToDaily = { navController.navigate("schedule_daily") },
             onNavigateToWeekly = { navController.navigate("schedule_weekly") },
             onNavigateToMonthly = { navController.navigate("schedule_monthly") },
-            onNavigateToSettings = { navController.navigate("settings")},
+//            onNavigateToSettings = { navController.navigate("settings")},
             navController = navController
             )
         }
@@ -340,21 +342,6 @@ fun AddJsonEvent(
 
 
     Box() {
-        Column() {
-
-            Spacer(Modifier.height(8.dp))
-
-            // Date header + previous/next day buttons
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.SpaceBetween,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-            }
-
-            Spacer(Modifier.height(8.dp))
-        }
-
         Box(
             modifier = Modifier.align(Alignment.BottomStart)
         ) {
@@ -1103,15 +1090,19 @@ fun DailyScheduleScreen(
                 }
             }
         }
-
-        Box(
-            modifier = Modifier.align(Alignment.BottomEnd)
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            modifier = Modifier.fillMaxSize()
         ) {
             Column(
-                horizontalAlignment = Alignment.End
+                horizontalAlignment = Alignment.Start
             ) {
                 AddJsonEvent(allEvents)
-
+            }
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 AppMenu(navController)
             }
         }
@@ -1233,14 +1224,19 @@ fun WeeklyScheduleScreen(
             )
         }
 
-        Box(
-            modifier = Modifier.align(Alignment.BottomEnd)
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            modifier = Modifier.fillMaxSize()
         ) {
             Column(
-                horizontalAlignment = Alignment.End
+                horizontalAlignment = Alignment.Start
             ) {
                 AddJsonEvent(allEvents)
-
+            }
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 AppMenu(navController)
             }
         }
@@ -1367,14 +1363,19 @@ fun MonthlyScheduleScreen(
             )
         }
 
-        Box(
-            modifier = Modifier.align(Alignment.BottomEnd)
+        Row(
+            verticalAlignment = Alignment.Bottom,
+            modifier = Modifier.fillMaxSize()
         ) {
             Column(
-                horizontalAlignment = Alignment.End
+                horizontalAlignment = Alignment.Start
             ) {
                 AddJsonEvent(allEvents)
-
+            }
+            Column(
+                horizontalAlignment = Alignment.End,
+                modifier = Modifier.fillMaxWidth()
+            ) {
                 AppMenu(navController)
             }
         }
@@ -1388,7 +1389,6 @@ fun HomeScreen(
     onNavigateToDaily: () -> Unit,
     onNavigateToWeekly: () -> Unit,
     onNavigateToMonthly: () -> Unit,
-    onNavigateToSettings: () -> Unit
     navController: NavController
 ) {
     val today = LocalDate.now()
@@ -1416,12 +1416,6 @@ fun HomeScreen(
                 contentDescription = "App Logo",
                 modifier = Modifier
                 .height(80.dp)
-            )
-
-            // App title
-            Text(
-                text = "Ordo",
-                style = MaterialTheme.typography.headlineLarge
             )
 
             // Date
@@ -1471,9 +1465,9 @@ fun HomeScreen(
                 ) {
                     Text("Upload Syllabus")
                 }
-                Button(onClick = onNavigateToSettings) {
-                    Text("Settings")
-                }
+//                Button(onClick = onNavigateToSettings) {
+//                    Text("Settings")
+//                }
             }
 
             Row(
@@ -1502,11 +1496,10 @@ fun HomeScreen(
                 }
             }
         }
-
         Box(
             modifier = Modifier.align(Alignment.BottomStart)
         ) {
-            AddJsonEvent()
+            AddJsonEvent(allEvents)
         }
 
         Box(
