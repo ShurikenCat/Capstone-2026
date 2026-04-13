@@ -132,15 +132,24 @@ def extract_schedule_from_pdf(pdf_path):
     # 1) Try rules first
     rule_events = extract_events_with_rules(cleaned_text)
     if len(rule_events) >= 3:
-        return rule_events
+        return {
+            "events": rule_events,
+            "source": "rules"
+        }
 
     # 2) Fallback to AI if rules are weak
     try:
         ai_events = extract_events_with_llm(cleaned_text)
         if ai_events:
-            return ai_events
+            return {
+                "events": ai_events,
+                "source": "ai"
+            }
     except Exception as e:
         print(f"LLM fallback failed: {e}")
 
     # 3) Final fallback: return whatever rules found
-    return rule_events
+    return {
+        "events": rule_events,
+        "source": "rules_fallback"
+    }

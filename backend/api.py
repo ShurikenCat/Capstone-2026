@@ -25,14 +25,10 @@ async def extract(file: UploadFile = File(...)):
         tmp_path = tmp.name
 
     try:
-        events = extract_schedule_from_pdf(tmp_path)
+        result = extract_schedule_from_pdf(tmp_path)
 
-        if events is None:
-            return {
-                "count": 0,
-                "events": [],
-                "warning": "extract_schedule_from_pdf returned None"
-            }
+        events = result.get("events", [])
+        source = result.get("source", "unknown")
 
         for event in events:
             if "date" in event and event["date"] is not None:
@@ -40,7 +36,8 @@ async def extract(file: UploadFile = File(...)):
 
         return {
             "count": len(events),
-            "events": events
+            "events": events,
+            "source": source
         }
 
     finally:
