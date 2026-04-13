@@ -157,7 +157,7 @@ fun AppMenu(
             contentPadding = PaddingValues(0.dp)
         ) {
             Text(
-                text = if (isExpanded) "×" else "+",
+                text = if (isExpanded) "×" else "=",
                 fontSize = 28.sp,
                 textAlign = TextAlign.Center
             )
@@ -352,7 +352,7 @@ fun AddJsonEvent(
         }
 
         Box(
-            modifier = Modifier.align(Alignment.BottomStart)
+            modifier = Modifier.align(Alignment.BottomEnd)
         ) {
             Column(
                 horizontalAlignment = Alignment.End

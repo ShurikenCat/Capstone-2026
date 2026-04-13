@@ -12,7 +12,7 @@ import re
 
 #Gets pdfs and turns them into images
 def convert_all_pdfs_to_images(image_format="png"):
-    pdf_folder = Path("syllabi_pdfs")
+    pdf_folder = Path("/data/data/com.example.capstone2026/files")
     output_root = Path("syllabi_images")
     output_root.mkdir(exist_ok=True)
 
@@ -31,7 +31,7 @@ def process_all_syllabus_images(
     model="meta-llama/llama-4-scout-17b-16e-instruct",
     sleep_seconds=10
 ):
-    client = Groq(api_key="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")
+    client = Groq(api_key="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")
     image_root = Path(image_root)
     output_root = Path(output_root)
 
