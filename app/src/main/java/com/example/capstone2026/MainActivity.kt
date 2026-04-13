@@ -36,6 +36,7 @@ import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.room.util.TableInfo
 import com.example.capstone2026.ui.theme.Capstone2026Theme
 import com.example.capstone2026.ui.theme.ThemeMode
 import com.example.capstone2026.ui.theme.readThemeMode
@@ -60,7 +61,10 @@ import java.time.format.DateTimeFormatter
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.buildJsonObject
-
+import java.time.DayOfWeek
+import kotlin.time.Duration.Companion.hours
+import kotlin.time.Duration.Companion.minutes
+import java.time.LocalDateTime
 
 
 class MainActivity : ComponentActivity() {
@@ -205,7 +209,8 @@ fun AppNavGraph(
                 onNavigateToUpload = { navController.navigate("upload") },
                 onNavigateToDaily = { navController.navigate("schedule_daily") },
                 onNavigateToWeekly = { navController.navigate("schedule_weekly") },
-                onNavigateToMonthly = { navController.navigate("schedule_monthly") }
+                onNavigateToMonthly = { navController.navigate("schedule_monthly") },
+                onNavigateToSettings = { navController.navigate("settings")}
             )
         }
         composable("upload") {
@@ -319,8 +324,9 @@ fun AppNavGraph(
 
 @Composable
 fun AddJsonEvent(
-    dateArg: String? = null
-) {
+    allEvents: SnapshotStateList<CalendarEvent>,
+    dateArg: String? = null,
+    ) {
     val context = LocalContext.current
 
     val initialDate = remember(dateArg) {
@@ -331,12 +337,8 @@ fun AddJsonEvent(
     var showAddDialog by remember { mutableStateOf(false) }
 
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp)
-    ) {
-        Column(modifier = Modifier.fillMaxSize()) {
+    Box() {
+        Column() {
 
             Spacer(Modifier.height(8.dp))
 
@@ -393,11 +395,13 @@ fun AddJsonEvent(
             AddEventJson(
                 selectedDate = selectedDate,
                 onDismiss = { showAddDialog = false },
-                onSave = { event ->
+                onSave = { event, event2 ->
                     saveJsonToFile(
                         context = context,
                         event = event
                     )
+                    allEvents.addAll(event2)
+                    saveEventsToIcs(context, allEvents)
                     showAddDialog = false
                 }
             )
@@ -423,7 +427,7 @@ data class CalendarEventJson(
 fun AddEventJson(
     selectedDate: LocalDate,
     onDismiss: () -> Unit,
-    onSave: (CalendarEventJson) -> Unit
+    onSave: (CalendarEventJson, List<CalendarEvent>) -> Unit
 ) {
     var title by remember { mutableStateOf("") }
 
@@ -436,8 +440,6 @@ fun AddEventJson(
     } catch (e: Exception) {
         null
     }
-    var sameDate by remember { mutableStateOf("True") }
-    val sameOptions = listOf("True", "False")
     var endDateText by remember { mutableStateOf(selectedDate.toString()) }
     val parsedEndDate = try {
         LocalDate.parse(endDateText)
@@ -500,7 +502,7 @@ fun AddEventJson(
     var endAmPm by remember { mutableStateOf("PM") }
 
     val inflexibleOptions = listOf("True", "False")
-    val eventOptions = listOf("Sleep", "Class", "Office Hours")
+    val eventOptions = listOf("Class", "Office Hours", "Meeting", "Sleep", "Other")
     val amPmOptions = listOf("AM", "PM")
     val hourOptions = (1..12).map { it.toString().padStart(2, '0') }
     val minuteOptions = (0..59).map { it.toString().padStart(2, '0') }
@@ -567,36 +569,6 @@ fun AddEventJson(
 
                 Spacer(Modifier.height(12.dp))
 
-                Text("Is the end date the same as the start date?")
-                Row{
-                    var sameDateExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { sameDateExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(sameDate)
-                        }
-                        DropdownMenu(
-                            expanded = sameDateExpanded,
-                            onDismissRequest = { sameDateExpanded = false },
-                            modifier = Modifier
-                                .requiredSizeIn(maxHeight = 200.dp)
-                        ) {
-                            sameOptions.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option) },
-                                    onClick = {
-                                        sameDate = option
-                                        sameDateExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-                Spacer(Modifier.height(12.dp))
-
                 OutlinedTextField(
                     value = endDateText,
                     onValueChange = {
@@ -650,7 +622,7 @@ fun AddEventJson(
 
                 Spacer(Modifier.height(12.dp))
 
-                Text("Event Type, Inflexible?")
+                Text("Event Type                    Is the event fixed?")
                 Row {
                     var eventTypeExpanded by remember { mutableStateOf(false) }
                     Box(modifier = Modifier.weight(1f)) {
@@ -711,7 +683,7 @@ fun AddEventJson(
 
                 Spacer(Modifier.height(12.dp))
 
-                Text("Start time")
+                Text("Start Time")
                 Row {
                     var hourExpanded by remember { mutableStateOf(false) }
                     Box(modifier = Modifier.weight(1f)) {
@@ -795,7 +767,7 @@ fun AddEventJson(
 
                 Spacer(Modifier.height(12.dp))
 
-                Text("End time")
+                Text("End Time")
                 Row {
                     var hourExpanded by remember { mutableStateOf(false) }
                     Box(modifier = Modifier.weight(1f)) {
@@ -899,7 +871,7 @@ fun AddEventJson(
                         onDismiss()
                         return@TextButton
                     }
-                    if (parsedEndDate == null && sameDate != "True") {
+                    if (parsedEndDate == null) {
                         onDismiss()
                         return@TextButton
                     }
@@ -911,309 +883,23 @@ fun AddEventJson(
                         inflexible = inflexible == "True",
                         notes = notes,
                         startDate = startDateText,
-                        endDate = if (sameDate == "True") startDateText else endDateText,
+                        endDate = endDateText,
                         startTime = "$startHr:$startMin $startAmPm",
-                        endTime = "$endHr:$endMin $endAmPm",
+                        endTime = if (parsedStartDate.isAfter(parsedEndDate)) {
+                            "${startHr}Hr:$startMin $startAmPm"
+                        } else {
+                            "$endHr:$endMin $endAmPm"
+                        },
                         repeated = if(repeated == "") {
                             null
                         } else {
                             repeated
                         }
                     )
-
-                    onSave(
-                        jsonEvent
-                    )
-                } catch (e: Exception) {
-                    e.printStackTrace()
-                    onDismiss()
-                }
-            }) {
-                Text("Save")
-            }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) {
-                Text("Cancel")
-            }
-        }
-    )
-}
-
-enum class EventMode { SINGLE_DAY, REPEATING }
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-fun AddEventDialog(
-    selectedDate: LocalDate,
-    onDismiss: () -> Unit,
-    onSave: (List<CalendarEvent>) -> Unit
-) {
-    var title by remember { mutableStateOf("") }
-
-    var startTimeRaw by remember { mutableStateOf("") }
-    var startAmPm by remember { mutableStateOf("AM") }
-
-    var endTimeRaw by remember { mutableStateOf("") }
-    var endAmPm by remember { mutableStateOf("AM") }
-
-    val amPmOptions = listOf("AM", "PM")
-
-    var mode by remember { mutableStateOf(EventMode.SINGLE_DAY) }
-    val allDays = remember { java.time.DayOfWeek.values().toList() }
-    var repeatDayOfWeek by remember { mutableStateOf(selectedDate.dayOfWeek) }
-    var repeatEndDate by remember { mutableStateOf(selectedDate.plusWeeks(4)) }
-    var showEndDatePicker by remember { mutableStateOf(false) }
-
-    fun clampMinutes(minutes: Int): Int = minutes.coerceIn(0, 59)
-
-    fun clampHour12(h: Int): Int {
-        if (h <= 0) return 12
-        if (h > 12) return 12
-        return h
-    }
-
-    fun formatWithColon(raw: String): String {
-        val digits = raw.filter { it.isDigit() }.take(4)
-        if (digits.isEmpty()) return ""
-        val padded = digits.padStart(4, '0')
-        val hRaw = padded.substring(0, 2).toInt()
-        val h = clampHour12(hRaw)
-        val mRaw = padded.substring(2, 4).toInt()
-        val m = clampMinutes(mRaw)
-        return "${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}"
-    }
-
-    fun parseTime12h(raw: String, amPm: String): java.time.LocalTime {
-        val digits = raw.filter { it.isDigit() }
-        require(digits.length in 3..4)
-        val padded = digits.padStart(4, '0')
-        val h12Raw = padded.substring(0, 2).toInt()
-        val h12 = clampHour12(h12Raw)
-        val mRaw = padded.substring(2, 4).toInt()
-        val m = clampMinutes(mRaw)
-        val h24 = when {
-            h12 == 12 && amPm == "AM" -> 0
-            h12 == 12 && amPm == "PM" -> 12
-            amPm == "PM" -> h12 + 12
-            else -> h12
-        }
-        return java.time.LocalTime.of(h24, m)
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add Event for $selectedDate") },
-        text = {
-            Column {
-                OutlinedTextField(
-                    value = title,
-                    onValueChange = { title = it },
-                    label = { Text("Event name") },
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                Spacer(Modifier.height(12.dp))
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
-                    Text("Mode:")
-                    Spacer(Modifier.width(8.dp))
-                    FilterChip(
-                        selected = mode == EventMode.SINGLE_DAY,
-                        onClick = { mode = EventMode.SINGLE_DAY },
-                        label = { Text("Single day") }
-                    )
-                    Spacer(Modifier.width(8.dp))
-                    FilterChip(
-                        selected = mode == EventMode.REPEATING,
-                        onClick = { mode = EventMode.REPEATING },
-                        label = { Text("Weekly repeat") }
-                    )
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                Text("Start time")
-                Row {
-                    var startFocused by remember { mutableStateOf(false) }
-                    OutlinedTextField(
-                        value = if (startFocused) startTimeRaw else formatWithColon(startTimeRaw),
-                        onValueChange = { input ->
-                            startTimeRaw = input.filter { it.isDigit() }.take(4)
-                        },
-                        label = { Text("HHMM") },
-                        modifier = Modifier
-                            .weight(2f)
-                            .onFocusChanged { state ->
-                                startFocused = state.isFocused
-                            }
-                    )
-
-                    Spacer(Modifier.width(8.dp))
-
-                    var startExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { startExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(startAmPm)
-                        }
-                        DropdownMenu(
-                            expanded = startExpanded,
-                            onDismissRequest = { startExpanded = false }
-                        ) {
-                            amPmOptions.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option) },
-                                    onClick = {
-                                        startAmPm = option
-                                        startExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                Spacer(Modifier.height(12.dp))
-
-                Text("End time (optional)")
-                Row {
-                    var endFocused by remember { mutableStateOf(false) }
-                    OutlinedTextField(
-                        value = if (endFocused) endTimeRaw else formatWithColon(endTimeRaw),
-                        onValueChange = { input ->
-                            endTimeRaw = input.filter { it.isDigit() }.take(4)
-                        },
-                        label = { Text("HHMM") },
-                        modifier = Modifier
-                            .weight(2f)
-                            .onFocusChanged { state ->
-                                endFocused = state.isFocused
-                            }
-                    )
-
-                    Spacer(Modifier.width(8.dp))
-
-                    var endExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { endExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(endAmPm)
-                        }
-                        DropdownMenu(
-                            expanded = endExpanded,
-                            onDismissRequest = { endExpanded = false }
-                        ) {
-                            amPmOptions.forEach { option ->
-                                DropdownMenuItem(
-                                    text = { Text(option) },
-                                    onClick = {
-                                        endAmPm = option
-                                        endExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-                }
-
-                if (mode == EventMode.REPEATING) {
-                    Spacer(Modifier.height(16.dp))
-                    Text("Repeats every week on")
-
-                    var dayExpanded by remember { mutableStateOf(false) }
-                    Box {
-                        OutlinedButton(onClick = { dayExpanded = true }) {
-                            Text(
-                                repeatDayOfWeek.name.lowercase()
-                                    .replaceFirstChar { it.uppercase() }
-                            )
-                        }
-                        DropdownMenu(
-                            expanded = dayExpanded,
-                            onDismissRequest = { dayExpanded = false }
-                        ) {
-                            allDays.forEach { dow ->
-                                DropdownMenuItem(
-                                    text = {
-                                        Text(
-                                            dow.name.lowercase()
-                                                .replaceFirstChar { it.uppercase() }
-                                        )
-                                    },
-                                    onClick = {
-                                        repeatDayOfWeek = dow
-                                        dayExpanded = false
-                                    }
-                                )
-                            }
-                        }
-                    }
-
-                    Spacer(Modifier.height(12.dp))
-                    Text("Repeat until")
-
-                    OutlinedButton(onClick = { showEndDatePicker = true }) {
-                        Text(repeatEndDate.toString())
-                    }
-
-                    if (showEndDatePicker) {
-                        val datePickerState = rememberDatePickerState(
-                            initialSelectedDateMillis = repeatEndDate
-                                .atStartOfDay(ZoneId.systemDefault())
-                                .toInstant()
-                                .toEpochMilli()
-                        )
-
-                        DatePickerDialog(
-                            onDismissRequest = { showEndDatePicker = false },
-                            confirmButton = {
-                                TextButton(
-                                    onClick = {
-                                        val millis = datePickerState.selectedDateMillis
-                                        if (millis != null) {
-                                            val localDate = Instant.ofEpochMilli(millis)
-                                                .atZone(ZoneId.systemDefault())
-                                                .toLocalDate()
-                                            repeatEndDate = localDate
-                                        }
-                                        showEndDatePicker = false
-                                    }
-                                ) {
-                                    Text("OK")
-                                }
-                            },
-                            dismissButton = {
-                                TextButton(onClick = { showEndDatePicker = false }) {
-                                    Text("Cancel")
-                                }
-                            }
-                        ) {
-                            DatePicker(state = datePickerState)
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(onClick = {
-                try {
-                    if (title.isBlank()) {
-                        onDismiss()
-                        return@TextButton
-                    }
-
                     val zoneId = ZoneId.systemDefault()
 
-                    val startLocalTime = parseTime12h(startTimeRaw, startAmPm)
-                    val endLocalTime =
-                        if (endTimeRaw.filter { it.isDigit() }.isNotBlank())
-                            parseTime12h(endTimeRaw, endAmPm)
-                        else null
+                    val startLocalTime = parseTime12h(startHr, startMin, startAmPm)
+                    val endLocalTime = parseTime12h(endHr, endMin, endAmPm)
 
                     // Helper to build one CalendarEvent for a given LocalDate
                     fun buildEventForDate(date: LocalDate): CalendarEvent {
@@ -1232,33 +918,93 @@ fun AddEventDialog(
                         return CalendarEvent(
                             title = title,
                             start = startDate,
-                            end = endDate
+                            end = endDate,
+                            eventType = eventType.ifBlank { null },
+                            notes = notes.ifBlank { null }
                         )
                     }
 
-                    val events: List<CalendarEvent> =
-                        if (mode == EventMode.SINGLE_DAY) {
-                            listOf(buildEventForDate(selectedDate))
-                        } else {
-                            val results = mutableListOf<CalendarEvent>()
-
-                            var current = selectedDate
-                            while (current.dayOfWeek != repeatDayOfWeek) {
-                                current = current.plusDays(1)
-                            }
-
-                            while (!current.isAfter(repeatEndDate)) {
-                                results.add(buildEventForDate(current))
-                                current = current.plusWeeks(1)
-                            }
-
-                            results
+                    val results = mutableListOf<CalendarEvent>()
+                    results.add(buildEventForDate(LocalDate.parse(startDateText)))
+                    if(sat) {
+                        var current = parsedStartDate.plusDays(1)
+                        while (current.dayOfWeek != DayOfWeek.SATURDAY) {
+                            current = current.plusDays(1)
                         }
+                        while (!current.isAfter(parsedEndDate)) {
+                            results.add(buildEventForDate(current))
+                            current = current.plusWeeks(1)
+                        }
+                    }
+                    if(mon) {
+                        var current = parsedStartDate.plusDays(1)
+                        while (current.dayOfWeek != DayOfWeek.MONDAY) {
+                            current = current.plusDays(1)
+                        }
+                        while (!current.isAfter(parsedEndDate)) {
+                            results.add(buildEventForDate(current))
+                            current = current.plusWeeks(1)
+                        }
+                    }
+                    if(tue) {
+                        var current = parsedStartDate.plusDays(1)
+                        while (current.dayOfWeek != DayOfWeek.TUESDAY) {
+                            current = current.plusDays(1)
+                        }
+                        while (!current.isAfter(parsedEndDate)) {
+                            results.add(buildEventForDate(current))
+                            current = current.plusWeeks(1)
+                        }
+                    }
+                    if(wed) {
+                        var current = parsedStartDate.plusDays(1)
+                        while (current.dayOfWeek != DayOfWeek.WEDNESDAY) {
+                            current = current.plusDays(1)
+                        }
+                        while (!current.isAfter(parsedEndDate)) {
+                            results.add(buildEventForDate(current))
+                            current = current.plusWeeks(1)
+                        }
+                    }
+                    if(thu) {
+                        var current = parsedStartDate.plusDays(1)
+                        while (current.dayOfWeek != DayOfWeek.THURSDAY) {
+                            current = current.plusDays(1)
+                        }
+                        while (!current.isAfter(parsedEndDate)) {
+                            results.add(buildEventForDate(current))
+                            current = current.plusWeeks(1)
+                        }
+                    }
+                    if(fri) {
+                        var current = parsedStartDate.plusDays(1)
+                        while (current.dayOfWeek != DayOfWeek.FRIDAY) {
+                            current = current.plusDays(1)
+                        }
+                        while (!current.isAfter(parsedEndDate)) {
+                            results.add(buildEventForDate(current))
+                            current = current.plusWeeks(1)
+                        }
+                    }
+                    if(sun) {
+                        var current = parsedStartDate.plusDays(1)
+                        while (current.dayOfWeek != DayOfWeek.SUNDAY) {
+                            current = current.plusDays(1)
+                        }
+                        while (!current.isAfter(parsedEndDate)) {
+                            results.add(buildEventForDate(current))
+                            current = current.plusWeeks(1)
+                        }
+                    }
 
-                    onSave(events)
+                    val events: List<CalendarEvent> = results
+
+                    onSave(
+                        jsonEvent,
+                        events
+                    )
                 } catch (e: Exception) {
                     e.printStackTrace()
-                } finally {
                     onDismiss()
                 }
             }) {
@@ -1362,30 +1108,10 @@ fun DailyScheduleScreen(
             Column(
                 horizontalAlignment = Alignment.End
             ) {
-                FloatingActionButton(
-                    onClick = { showAddDialog = true },
-                    modifier = Modifier
-                        .padding(bottom = 8.dp)
-                ) {
-                    Text("+")
-                }
+                AddJsonEvent(allEvents)
 
                 AppMenu(navController)
             }
-        }
-
-        if (showAddDialog) {
-            AddEventDialog(
-                selectedDate = selectedDate,
-                onDismiss = { showAddDialog = false },
-                onSave = { events ->
-                    allEvents.addAll(events)
-                    saveEventsToIcs(context, allEvents)
-                    val file = ensureWritableIcs(context)
-                    println("ICS content:\n" + file.readText())
-                    showAddDialog = false
-                }
-            )
         }
     }
 }
@@ -1393,7 +1119,7 @@ fun DailyScheduleScreen(
 @Composable
 fun WeeklyScheduleScreen(
     navController: NavController,
-    allEvents: List<CalendarEvent>
+    allEvents: SnapshotStateList<CalendarEvent>
 ) {
     val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
@@ -1508,7 +1234,13 @@ fun WeeklyScheduleScreen(
         Box(
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
-            AppMenu(navController)
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                AddJsonEvent(allEvents)
+
+                AppMenu(navController)
+            }
         }
     }
 }
@@ -1516,7 +1248,7 @@ fun WeeklyScheduleScreen(
 @Composable
 fun MonthlyScheduleScreen(
     navController: NavController,
-    allEvents: List<CalendarEvent>
+    allEvents: SnapshotStateList<CalendarEvent>
 ) {
     val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
@@ -1636,89 +1368,118 @@ fun MonthlyScheduleScreen(
         Box(
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
-            AppMenu(navController)
+            Column(
+                horizontalAlignment = Alignment.End
+            ) {
+                AddJsonEvent(allEvents)
+
+                AppMenu(navController)
+            }
         }
     }
 }
 
 @Composable
 fun HomeScreen(
-    allEvents: List<CalendarEvent>,
+    allEvents: SnapshotStateList<CalendarEvent>,
     onNavigateToUpload: () -> Unit,
     onNavigateToDaily: () -> Unit,
     onNavigateToWeekly: () -> Unit,
-    onNavigateToMonthly: () -> Unit
+    onNavigateToMonthly: () -> Unit,
+    onNavigateToSettings: () -> Unit
 ) {
     val today = LocalDate.now()
     val formattedDate = today.format(
         DateTimeFormatter.ofPattern("EEEE, MMMM d")
     )
 
+
     val upcomingEvents = allEvents
         .filter { it.start.toLocalDate() >= today }
         .sortedBy { it.start }
         .take(3)
+    Box() {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
 
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
-    ) {
+            // App title
+            Text(
+                text = "Ordo",
+                style = MaterialTheme.typography.headlineLarge
+            )
 
-        // App title
-        Text(
-            text = "ordo",
-            style = MaterialTheme.typography.headlineLarge
-        )
+            // Date
+            Text(
+                text = formattedDate,
+                style = MaterialTheme.typography.bodyLarge
+            )
 
-        // Date
-        Text(
-            text = formattedDate,
-            style = MaterialTheme.typography.bodyLarge
-        )
+            // Upcoming events
+            Text(
+                text = "Upcoming",
+                style = MaterialTheme.typography.titleMedium
+            )
 
-        // Upcoming events
-        Text(
-            text = "Upcoming",
-            style = MaterialTheme.typography.titleMedium
-        )
+            if (upcomingEvents.isEmpty()) {
+                Text("No upcoming events")
+            } else {
+                upcomingEvents.forEach { event ->
+                    Card {
+                        Column(modifier = Modifier.padding(12.dp)) {
+//                            val formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
+//                            val dateTime = LocalDateTime.parse(event.start.toString(), formatter)
+//                            val formattedTime = dateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
 
-        if (upcomingEvents.isEmpty()) {
-            Text("No upcoming events")
-        } else {
-            upcomingEvents.forEach { event ->
-                Card {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(event.title)
-                        Text(event.start.toString())
+                            Text("Title: " + event.title)
+                            Text("Date: " + formatDate(event.start))
+                            if (!event.eventType.isNullOrBlank()){
+                                Text("Event Type: " + event.eventType)
+                            }
+                            if(!event.notes.isNullOrBlank()) {
+                                Text("Notes: " + event.notes)
+                            }
+
+                        }
                     }
                 }
             }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Navigation buttons
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)){
+                Button(onClick = onNavigateToUpload) {
+                    Text("Upload Syllabus")
+                }
+                Button(onClick = onNavigateToSettings) {
+                    Text("Settings")
+                }
+            }
+
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = onNavigateToDaily) {
+                    Text("Daily")
+                }
+                Button(onClick = onNavigateToWeekly) {
+                    Text("Weekly")
+                }
+                Button(onClick = onNavigateToMonthly) {
+                    Text("Monthly")
+                }
+            }
+        }
+        Box(modifier = Modifier
+            .align(Alignment.BottomEnd)
+            .padding(16.dp)) {
+            AddJsonEvent(allEvents)
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Navigation buttons
-            Button(onClick = onNavigateToUpload) {
-                Text("Upload Syllabus")
-            }
-
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onNavigateToDaily) {
-                Text("Daily")
-            }
-            Button(onClick = onNavigateToWeekly) {
-                Text("Weekly")
-            }
-            Button(onClick = onNavigateToMonthly) {
-                Text("Monthly")
-            }
-        }
-
-        AddJsonEvent()
     }
+
 }
 
 @Composable
@@ -1861,6 +1622,13 @@ fun EventCard(
 
             Spacer(Modifier.height(4.dp))
 
+            if (!event.eventType.isNullOrBlank()) {
+                Text(
+                    text = "Event Type: " + event.eventType,
+                    fontSize = 14.sp
+                )
+            }
+
             Text(
                 text = "Start: ${formatDate(event.start)}",
                 fontSize = 14.sp
@@ -1869,6 +1637,13 @@ fun EventCard(
             event.end?.let {
                 Text(
                     text = "End: ${formatDate(it)}",
+                    fontSize = 14.sp
+                )
+            }
+
+            if (!event.notes.isNullOrBlank()) {
+                Text(
+                    text = "Notes: " + event.notes,
                     fontSize = 14.sp
                 )
             }
@@ -1913,17 +1688,9 @@ data class CalendarEvent(
     val title: String,
     val start: Date,
     val end: Date? = null,
-    val repeatRule: RepeatRule? = null
+    val eventType: String? = null,
+    val notes: String? = null
 )
-
-data class RepeatRule(
-    val frequency: RepeatFrequency,
-    val dayOfWeek: java.time.DayOfWeek,
-    val until: LocalDate
-)
-
-enum class RepeatFrequency { WEEKLY }
-
 fun Date.toLocalDate(): LocalDate =
     Instant.ofEpochMilli(time)
         .atZone(ZoneId.systemDefault())
@@ -1966,18 +1733,26 @@ fun List<CalendarEvent>.toIcsString(): String {
 
     val fmt = SimpleDateFormat("yyyyMMdd'T'HHmmss'Z'", Locale.US)
     fmt.timeZone = TimeZone.getTimeZone("UTC")
-
+    fun escapeIcs(text: String): String {
+        return text
+            .replace("\\", "\\\\")
+            .replace(";", "\\;")
+            .replace(",", "\\,")
+            .replace("\n", "\\n")
+    }
     for ((index, event) in this.withIndex()) {
-        val cleanTitle = event.title
-            .replace("\r", " ")
-            .replace("\n", " ")
-
         sb.appendLine("BEGIN:VEVENT")
         sb.appendLine("UID:app-$index@capstone2026")
-        sb.appendLine("SUMMARY:$cleanTitle")
+        sb.appendLine("SUMMARY:${escapeIcs(event.title)}")
         sb.appendLine("DTSTART:${fmt.format(event.start)}")
         event.end?.let {
             sb.appendLine("DTEND:${fmt.format(it)}")
+        }
+        event.notes?.let{
+            sb.appendLine("DESCRIPTION:${escapeIcs(event.notes)}")
+        }
+        event.eventType?.let{
+            sb.appendLine("CATEGORIES:${escapeIcs(event.eventType)}")
         }
         sb.appendLine("END:VEVENT")
     }
