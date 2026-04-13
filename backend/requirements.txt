@@ -5,3 +5,5 @@ dateparser
 icalendar
 python-dateutil
 python-multipart
+groq
+python-dotenv

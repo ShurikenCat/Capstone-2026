@@ -1,3 +1,4 @@
+import os
 from groq import Groq
 import base64
 import time
@@ -31,7 +32,10 @@ def process_all_syllabus_images(
     model="meta-llama/llama-4-scout-17b-16e-instruct",
     sleep_seconds=10
 ):
-    client = Groq(api_key="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")
+    api_key = os.getenv("GROQ_API_KEY")
+    if not api_key:
+        raise ValueError("GROQ_API_KEY environment variable is not set.")
+    client = Groq(api_key=api_key)
     image_root = Path(image_root)
     output_root = Path(output_root)
 
