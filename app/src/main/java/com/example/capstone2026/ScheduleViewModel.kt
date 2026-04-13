@@ -33,4 +33,5 @@ class ScheduleViewModel(application: Application) : AndroidViewModel(application
             repository.setDefaultView(view)
         }
     }
+
 }

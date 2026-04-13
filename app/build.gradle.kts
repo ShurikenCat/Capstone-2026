@@ -60,6 +60,7 @@ dependencies {
     androidTestImplementation(libs.androidx.compose.ui.test.junit4)
     debugImplementation(libs.androidx.compose.ui.tooling)
     debugImplementation(libs.androidx.compose.ui.test.manifest)
+    implementation("com.kizitonwose.calendar:compose:2.9.0")
     // Room
     implementation("androidx.room:room-runtime:$roomVersion")
     ksp("androidx.room:room-compiler:$roomVersion")
@@ -70,12 +71,5 @@ dependencies {
 
     implementation("org.mnode.ical4j:ical4j:2.0.5")
     implementation("com.kizitonwose.calendar:compose:2.10.0")
-    implementation("com.squareup.retrofit2:retrofit:2.11.0")
-    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-    implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
-
-    implementation("androidx.compose.material3:material3:1.2.1")
-    implementation("androidx.compose.material3:material3-window-size-class:1.2.1")
     implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.8.1")
 }
