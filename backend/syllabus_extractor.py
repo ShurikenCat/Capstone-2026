@@ -1,8 +1,10 @@
 import re
 import pdfplumber
 
+from llm_extractor import extract_events_with_llm
+
 MONTHS = r"(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)"
-YEAR = 2026  # set this manually for now, or infer from syllabus header
+YEAR = 2026  # you can improve this later by inferring from syllabus text
 
 
 def normalize_event_type(text: str) -> str:
@@ -19,10 +21,6 @@ def normalize_event_type(text: str) -> str:
 
 
 def parse_date_from_line(line: str):
-    # Example matches:
-    # (Thu Feb 15)
-    # Thu Feb 15
-    # Mar 28
     m = re.search(rf"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)?\s*({MONTHS})\s+(\d{{1,2}})", line)
     if not m:
         return None
@@ -39,29 +37,57 @@ def parse_date_from_line(line: str):
     return f"{YEAR:04d}-{month_map[month]:02d}-{day:02d}"
 
 
-def extract_schedule_from_pdf(pdf_path):
+def dedupe_events(events):
+    seen = set()
+    unique_events = []
+
+    for event in events:
+        key = (
+            event.get("date"),
+            event.get("type"),
+            (event.get("description") or "").strip().lower()
+        )
+        if key not in seen:
+            seen.add(key)
+            unique_events.append(event)
+
+    return unique_events
+
+
+def extract_text_from_pdf(pdf_path: str) -> str:
     full_text = ""
 
     with pdfplumber.open(pdf_path) as pdf:
         for page in pdf.pages:
             full_text += "\n" + (page.extract_text() or "")
 
-    # Narrow to schedule section
+    return full_text
+
+
+def narrow_to_schedule_section(full_text: str) -> str:
     lower = full_text.lower()
-    start = lower.find("course schedule")
-    if start != -1:
-        text = full_text[start:]
+    schedule_markers = [
+        "course schedule",
+        "schedule",
+        "calendar",
+        "weekly schedule",
+        "tentative schedule"
+    ]
+
+    start_positions = [lower.find(marker) for marker in schedule_markers if lower.find(marker) != -1]
+    if start_positions:
+        text = full_text[min(start_positions):]
     else:
         text = full_text
 
-    # Stop before policy-heavy sections if present
     end_markers = [
         "attendance",
         "academic integrity",
         "disability",
         "accommodations",
         "student support",
-        "statement on"
+        "statement on",
+        "university policies"
     ]
 
     lowered_text = text.lower()
@@ -69,36 +95,61 @@ def extract_schedule_from_pdf(pdf_path):
     if end_positions:
         text = text[:min(end_positions)]
 
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return text
 
+
+def extract_events_with_rules(text: str):
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
     events = []
 
     for line in lines:
         line_lower = line.lower()
 
-        # Require the line to look like a real schedule item
         has_event_word = any(word in line_lower for word in [
-            "exam", "midterm", "final", "quiz", "project", "assignment", "homework", "due"
+            "exam", "midterm", "final", "quiz", "project",
+            "assignment", "homework", "hw", "due", "presentation"
         ])
-        has_date = parse_date_from_line(line) is not None
+        parsed_date = parse_date_from_line(line)
 
-        if not (has_event_word and has_date):
+        if not (has_event_word and parsed_date):
             continue
 
         events.append({
-            "date": parse_date_from_line(line),
+            "date": parsed_date,
             "type": normalize_event_type(line),
             "description": line,
             "assignment": None
         })
 
-    # dedupe
-    seen = set()
-    unique_events = []
-    for e in events:
-        key = (e["date"], e["type"], e["description"])
-        if key not in seen:
-            seen.add(key)
-            unique_events.append(e)
+    events.sort(key=lambda e: e["date"])
+    return dedupe_events(events)
 
-    return unique_events
+
+def extract_schedule_from_pdf(pdf_path):
+    full_text = extract_text_from_pdf(pdf_path)
+    cleaned_text = narrow_to_schedule_section(full_text)
+
+    # 1) Try rules first
+    rule_events = extract_events_with_rules(cleaned_text)
+    if len(rule_events) >= 3:
+        return {
+            "events": rule_events,
+            "source": "rules"
+        }
+
+    # 2) Fallback to AI if rules are weak
+    try:
+        ai_events = extract_events_with_llm(cleaned_text)
+        if ai_events:
+            return {
+                "events": ai_events,
+                "source": "ai"
+            }
+    except Exception as e:
+        print(f"LLM fallback failed: {e}")
+
+    # 3) Final fallback: return whatever rules found
+    return {
+        "events": rule_events,
+        "source": "rules_fallback"
+    }

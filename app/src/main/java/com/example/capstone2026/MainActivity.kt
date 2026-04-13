@@ -56,12 +56,12 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.util.*
-import java.time.format.DateTimeFormatter
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.buildJsonObject
-
-
+import java.time.format.DateTimeFormatter
+import androidx.compose.foundation.Image
+import androidx.compose.ui.res.painterResource
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -201,13 +201,14 @@ fun AppNavGraph(
 
         composable("home") {
             HomeScreen(
-                allEvents = allEvents,
-                onNavigateToUpload = { navController.navigate("upload") },
-                onNavigateToDaily = { navController.navigate("schedule_daily") },
-                onNavigateToWeekly = { navController.navigate("schedule_weekly") },
-                onNavigateToMonthly = { navController.navigate("schedule_monthly") }
-            )
-        }
+            allEvents = allEvents,
+            onNavigateToUpload = { navController.navigate("upload") },
+            onNavigateToDaily = { navController.navigate("schedule_daily") },
+            onNavigateToWeekly = { navController.navigate("schedule_weekly") },
+            onNavigateToMonthly = { navController.navigate("schedule_monthly") },
+            navController = navController
+    )
+}
         composable("upload") {
             UploadSyllabusScreen(
                 onImportEvents = { extractedEvents ->
@@ -316,7 +317,6 @@ fun AppNavGraph(
 //        }
 //    }
 //}
-
 @Composable
 fun AddJsonEvent(
     dateArg: String? = null
@@ -352,7 +352,7 @@ fun AddJsonEvent(
         }
 
         Box(
-            modifier = Modifier.align(Alignment.BottomEnd)
+            modifier = Modifier.align(Alignment.BottomStart)
         ) {
             Column(
                 horizontalAlignment = Alignment.End
@@ -939,6 +939,8 @@ fun AddEventJson(
         }
     )
 }
+
+
 
 enum class EventMode { SINGLE_DAY, REPEATING }
 
@@ -1647,7 +1649,8 @@ fun HomeScreen(
     onNavigateToUpload: () -> Unit,
     onNavigateToDaily: () -> Unit,
     onNavigateToWeekly: () -> Unit,
-    onNavigateToMonthly: () -> Unit
+    onNavigateToMonthly: () -> Unit,
+    navController: NavController
 ) {
     val today = LocalDate.now()
     val formattedDate = today.format(
@@ -1659,65 +1662,94 @@ fun HomeScreen(
         .sortedBy { it.start }
         .take(3)
 
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .padding(16.dp)
     ) {
+        Column(
+            modifier = Modifier.fillMaxSize(),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Image(
+                painter = painterResource(id = R.drawable.logo),
+                contentDescription = "App Logo",
+                modifier = Modifier
+                .height(80.dp)
+            )
 
-        // App title
-        Text(
-            text = "ordo",
-            style = MaterialTheme.typography.headlineLarge
-        )
+            Text(
+                text = formattedDate,
+                style = MaterialTheme.typography.bodyLarge
+            )
 
-        // Date
-        Text(
-            text = formattedDate,
-            style = MaterialTheme.typography.bodyLarge
-        )
+            Text(
+                text = "Upcoming",
+                style = MaterialTheme.typography.titleMedium
+            )
 
-        // Upcoming events
-        Text(
-            text = "Upcoming",
-            style = MaterialTheme.typography.titleMedium
-        )
-
-        if (upcomingEvents.isEmpty()) {
-            Text("No upcoming events")
-        } else {
-            upcomingEvents.forEach { event ->
-                Card {
-                    Column(modifier = Modifier.padding(12.dp)) {
-                        Text(event.title)
-                        Text(event.start.toString())
+            if (upcomingEvents.isEmpty()) {
+                Text("No upcoming events")
+            } else {
+                upcomingEvents.forEach { event ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(event.title)
+                            Text(event.start.toString())
+                        }
                     }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            Button(
+                onClick = onNavigateToUpload,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("Upload Syllabus")
+            }
+
+            Row(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Button(
+                    onClick = onNavigateToDaily,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Daily")
+                }
+
+                Button(
+                    onClick = onNavigateToWeekly,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Weekly")
+                }
+
+                Button(
+                    onClick = onNavigateToMonthly,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Monthly")
                 }
             }
         }
 
-        Spacer(modifier = Modifier.height(12.dp))
-
-        // Navigation buttons
-            Button(onClick = onNavigateToUpload) {
-                Text("Upload Syllabus")
-            }
-
-
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            Button(onClick = onNavigateToDaily) {
-                Text("Daily")
-            }
-            Button(onClick = onNavigateToWeekly) {
-                Text("Weekly")
-            }
-            Button(onClick = onNavigateToMonthly) {
-                Text("Monthly")
-            }
+        Box(
+            modifier = Modifier.align(Alignment.BottomStart)
+        ) {
+            AddJsonEvent()
         }
 
-        AddJsonEvent()
+        Box(
+            modifier = Modifier.align(Alignment.BottomEnd)
+        ) {
+            AppMenu(navController)
+        }
     }
 }
 
