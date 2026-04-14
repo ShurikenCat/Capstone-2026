@@ -25,9 +25,13 @@ import okhttp3.RequestBody.Companion.toRequestBody
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import androidx.navigation.NavController
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.text.style.TextAlign
 
 @Composable
 fun UploadSyllabusScreen(
+    navController: NavController,
     onImportEvents: (List<EventDto>) -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -80,66 +84,76 @@ fun UploadSyllabusScreen(
             }
         }
     )
-
-    Column(
+    Box(
         modifier = Modifier
             .fillMaxSize()
             .padding(16.dp)
     ) {
-        Text("Upload Syllabus", style = MaterialTheme.typography.headlineSmall)
-        Spacer(Modifier.height(8.dp))
-        Text(status)
-        extractionSource?.let { source ->
-    val sourceLabel = when (source) {
-        "rules" -> "Rule-based extraction"
-        "ai" -> "AI extraction"
-        "rules_fallback" -> "Rule-based fallback"
-        else -> "Unknown extraction source"
-    }
-
-    Text(
-        text = "Method: $sourceLabel",
-        style = MaterialTheme.typography.bodyMedium
-    )
-
-    Spacer(Modifier.height(12.dp))
-}
-        Spacer(Modifier.height(12.dp))
-
-        Button(
-            onClick = { picker.launch(arrayOf("application/pdf")) },
-            enabled = !loading
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(16.dp)
         ) {
-            Text(if (loading) "Working..." else "Pick PDF")
-        }
+            Text("Upload Syllabus", style = MaterialTheme.typography.headlineSmall)
+            Spacer(Modifier.height(8.dp))
+            Text(status)
+            extractionSource?.let { source ->
+                val sourceLabel = when (source) {
+                    "rules" -> "Rule-based extraction"
+                    "ai" -> "AI extraction"
+                    "rules_fallback" -> "Rule-based fallback"
+                    else -> "Unknown extraction source"
+                }
 
-        Spacer(Modifier.height(16.dp))
+                Text(
+                    text = "Method: $sourceLabel",
+                    style = MaterialTheme.typography.bodyMedium
+                )
 
-        if (events.isNotEmpty()) {
+                Spacer(Modifier.height(12.dp))
+            }
+            Spacer(Modifier.height(12.dp))
+
             Button(
-                onClick = { onImportEvents(events) },
-                enabled = !loading,
-                modifier = Modifier.fillMaxWidth()
+                onClick = { picker.launch(arrayOf("application/pdf")) },
+                enabled = !loading
             ) {
-                Text("Import All to App Calendar")
+                Text(if (loading) "Working..." else "Pick PDF")
             }
 
             Spacer(Modifier.height(16.dp))
 
-            Text("Extracted Events", style = MaterialTheme.typography.titleMedium)
-            Spacer(Modifier.height(8.dp))
+            if (events.isNotEmpty()) {
+                Button(
+                    onClick = { onImportEvents(events) },
+                    enabled = !loading,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Import All to App Calendar")
+                }
 
-            LazyColumn(
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                modifier = Modifier.fillMaxSize()
-            ) {
-                items(events.take(40)) { event ->
-                    EventCard(
-                        event = event,
-                        onAddToAppCalendar = { onImportEvents(listOf(event)) }
-                    )
+                Spacer(Modifier.height(16.dp))
+
+                Text("Extracted Events", style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(8.dp))
+
+                LazyColumn(
+                    verticalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxSize()
+                ) {
+                    items(events.take(40)) { event ->
+                        EventCard(
+                            event = event,
+                            onAddToAppCalendar = { onImportEvents(listOf(event)) }
+                        )
+                    }
                 }
             }
+        }
+        Box(
+            modifier = Modifier.align(Alignment.BottomEnd)
+        ) {
+            AppMenu(navController)
         }
     }
 }

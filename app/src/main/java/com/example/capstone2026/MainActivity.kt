@@ -220,6 +220,7 @@ fun AppNavGraph(
         }
         composable("upload") {
             UploadSyllabusScreen(
+                navController,
                 onImportEvents = { extractedEvents ->
                     val converted = extractedEvents.mapNotNull { it.toCalendarEvent() }
 
@@ -1629,10 +1630,35 @@ fun ScheduleModeSwitch(
 }
 
 @Composable
+fun ConfirmDelete(
+    onDelete: () -> Unit,
+    onDismiss: () -> Unit
+    ) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Confirm Delete") },
+        text = { Text("Are you sure you wish to DELETE this event?") },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDelete) {
+                Text("Delete")
+            }
+        }
+    )
+}
+
+@Composable
 fun EventCard(
     event: CalendarEvent,
     onDelete: (() -> Unit)? = null
 ) {
+
+    var showConfirmDelete by remember { mutableStateOf(false) }
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -1679,7 +1705,7 @@ fun EventCard(
             if (onDelete != null) {
                 Spacer(Modifier.height(8.dp))
                 TextButton(
-                    onClick = onDelete,
+                    onClick = { showConfirmDelete = true },
                     colors = ButtonDefaults.textButtonColors(
                         contentColor = MaterialTheme.colorScheme.error
                     )
@@ -1688,6 +1714,17 @@ fun EventCard(
                 }
             }
         }
+    }
+    if (showConfirmDelete && onDelete != null) {
+        ConfirmDelete(
+            onDelete = {
+                onDelete()
+                showConfirmDelete = false
+            },
+            onDismiss = {
+                showConfirmDelete = false
+            }
+        )
     }
 }
 
