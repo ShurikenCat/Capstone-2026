@@ -69,6 +69,8 @@ import java.time.DayOfWeek
 import kotlin.time.Duration.Companion.hours
 import kotlin.time.Duration.Companion.minutes
 import java.time.LocalDateTime
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 
 
 class MainActivity : ComponentActivity() {
@@ -413,6 +415,7 @@ data class CalendarEventJson(
     val repeated: String? = null
 )
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEventJson(
     selectedDate: LocalDate,
@@ -613,20 +616,31 @@ fun AddEventJson(
                 Spacer(Modifier.height(12.dp))
 
                 Text("Event Type                    Is the event fixed?")
-                Row {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
                     var eventTypeExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { eventTypeExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(eventType)
-                        }
-                        DropdownMenu(
-                            expanded = eventTypeExpanded,
-                            onDismissRequest = { eventTypeExpanded = false },
+                    ExposedDropdownMenuBox(
+                        expanded = eventTypeExpanded,
+                        onExpandedChange = {eventTypeExpanded = !eventTypeExpanded},
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        TextField(
+                            value = eventType,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = eventTypeExpanded)
+                            },
+                            colors = ExposedDropdownMenuDefaults.textFieldColors(),
                             modifier = Modifier
-                                .requiredSizeIn(maxHeight = 200.dp)
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = eventTypeExpanded,
+                            onDismissRequest = { eventTypeExpanded = false }
                         ) {
                             eventOptions.forEach { option ->
                                 DropdownMenuItem(
@@ -634,7 +648,8 @@ fun AddEventJson(
                                     onClick = {
                                         eventType = option
                                         eventTypeExpanded = false
-                                    }
+                                    },
+                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                                 )
                             }
                         }
@@ -643,18 +658,26 @@ fun AddEventJson(
                     Spacer(Modifier.height(12.dp))
 
                     var inflexibleExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { inflexibleExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(inflexible)
-                        }
-                        DropdownMenu(
-                            expanded = inflexibleExpanded,
-                            onDismissRequest = { inflexibleExpanded = false },
+                    ExposedDropdownMenuBox(
+                        expanded = inflexibleExpanded,
+                        onExpandedChange = {inflexibleExpanded = !inflexibleExpanded},
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        TextField(
+                            value = inflexible,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = inflexibleExpanded)
+                            },
+                            colors = ExposedDropdownMenuDefaults.textFieldColors(),
                             modifier = Modifier
-                                .requiredSizeIn(maxHeight = 200.dp)
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = inflexibleExpanded,
+                            onDismissRequest = { inflexibleExpanded = false }
                         ) {
                             inflexibleOptions.forEach { option ->
                                 DropdownMenuItem(
@@ -662,7 +685,8 @@ fun AddEventJson(
                                     onClick = {
                                         inflexible = option
                                         inflexibleExpanded = false
-                                    }
+                                    },
+                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                                 )
                             }
                         }
@@ -674,20 +698,30 @@ fun AddEventJson(
                 Spacer(Modifier.height(12.dp))
 
                 Text("Start Time")
-                Row {
+                Row(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
                     var hourExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { hourExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(startHr)
-                        }
-                        DropdownMenu(
+                    ExposedDropdownMenuBox(
+                        expanded = hourExpanded,
+                        onExpandedChange = {hourExpanded = !hourExpanded},
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        TextField(
+                            value = startHr,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = hourExpanded)
+                            },
+                            colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                            modifier = Modifier
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
                             expanded = hourExpanded,
                             onDismissRequest = { hourExpanded = false },
-                            modifier = Modifier
-                                .requiredSizeIn(maxHeight = 200.dp)
                         ) {
                             hourOptions.forEach { option ->
                                 DropdownMenuItem(
@@ -695,26 +729,33 @@ fun AddEventJson(
                                     onClick = {
                                         startHr = option
                                         hourExpanded = false
-                                    }
+                                    },
+                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                                 )
                             }
                         }
                     }
-
-                    Spacer(Modifier.height(12.dp))
                     var minuteExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { minuteExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(startMin)
-                        }
-                        DropdownMenu(
-                            expanded = minuteExpanded,
-                            onDismissRequest = { minuteExpanded = false },
+                    ExposedDropdownMenuBox(
+                        expanded = minuteExpanded,
+                        onExpandedChange = {minuteExpanded = !minuteExpanded},
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        TextField(
+                            value = startMin,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = minuteExpanded)
+                            },
+                            colors = ExposedDropdownMenuDefaults.textFieldColors(),
                             modifier = Modifier
-                                .requiredSizeIn(maxHeight = 200.dp)
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = minuteExpanded,
+                            onDismissRequest = { minuteExpanded = false }
                         ) {
                             minuteOptions.forEach { option ->
                                 DropdownMenuItem(
@@ -722,23 +763,31 @@ fun AddEventJson(
                                     onClick = {
                                         startMin = option
                                         minuteExpanded = false
-                                    }
+                                    },
+                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                                 )
                             }
                         }
                     }
-
-                    Spacer(Modifier.width(8.dp))
-
                     var startExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { startExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(startAmPm)
-                        }
-                        DropdownMenu(
+                    ExposedDropdownMenuBox (
+                        expanded = startExpanded,
+                        onExpandedChange = {startExpanded = !startExpanded},
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        TextField(
+                            value = startAmPm,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = startExpanded)
+                            },
+                            colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                            modifier = Modifier
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
                             expanded = startExpanded,
                             onDismissRequest = { startExpanded = false }
                         ) {
@@ -748,7 +797,8 @@ fun AddEventJson(
                                     onClick = {
                                         startAmPm = option
                                         startExpanded = false
-                                    }
+                                    },
+                                    contentPadding = ExposedDropdownMenuDefaults.ItemContentPadding
                                 )
                             }
                         }
@@ -758,20 +808,28 @@ fun AddEventJson(
                 Spacer(Modifier.height(12.dp))
 
                 Text("End Time")
-                Row {
+                Row(modifier = Modifier.fillMaxWidth()) {
                     var hourExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { hourExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(endHr)
-                        }
-                        DropdownMenu(
-                            expanded = hourExpanded,
-                            onDismissRequest = { hourExpanded = false },
+                    ExposedDropdownMenuBox (
+                        expanded = hourExpanded,
+                        onExpandedChange = {hourExpanded = !hourExpanded},
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        TextField(
+                            value = endHr,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = hourExpanded)
+                            },
+                            colors = ExposedDropdownMenuDefaults.textFieldColors(),
                             modifier = Modifier
-                                .requiredSizeIn(maxHeight = 200.dp)
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = hourExpanded,
+                            onDismissRequest = { hourExpanded = false }
                         ) {
                             hourOptions.forEach { option ->
                                 DropdownMenuItem(
@@ -785,21 +843,27 @@ fun AddEventJson(
                         }
                     }
 
-                    Spacer(Modifier.width(8.dp))
-
                     var minuteExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { minuteExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(endMin)
-                        }
-                        DropdownMenu(
+                    ExposedDropdownMenuBox (
+                        expanded = minuteExpanded,
+                        onExpandedChange = {minuteExpanded = !minuteExpanded},
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        TextField(
+                            value = endMin,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = minuteExpanded)
+                            },
+                            colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                            modifier = Modifier
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
                             expanded = minuteExpanded,
                             onDismissRequest = { minuteExpanded = false },
-                            modifier = Modifier
-                                .requiredSizeIn(maxHeight = 200.dp)
                         ) {
                             minuteOptions.forEach { option ->
                                 DropdownMenuItem(
@@ -813,17 +877,25 @@ fun AddEventJson(
                         }
                     }
 
-                    Spacer(Modifier.width(8.dp))
-
                     var endExpanded by remember { mutableStateOf(false) }
-                    Box(modifier = Modifier.weight(1f)) {
-                        OutlinedButton(
-                            onClick = { endExpanded = true },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(endAmPm)
-                        }
-                        DropdownMenu(
+                    ExposedDropdownMenuBox (
+                        expanded = endExpanded,
+                        onExpandedChange = {endExpanded = !endExpanded},
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        TextField(
+                            value = endAmPm,
+                            onValueChange = {},
+                            readOnly = true,
+                            trailingIcon = {
+                                ExposedDropdownMenuDefaults.TrailingIcon(expanded = endExpanded)
+                            },
+                            colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                            modifier = Modifier
+                                .menuAnchor(MenuAnchorType.PrimaryNotEditable)
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
                             expanded = endExpanded,
                             onDismissRequest = { endExpanded = false }
                         ) {
@@ -1437,20 +1509,19 @@ fun HomeScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Column(modifier = Modifier.padding(12.dp)) {
+                            Column(modifier = Modifier.padding(12.dp)) {
 //                            val formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
 //                            val dateTime = LocalDateTime.parse(event.start.toString(), formatter)
 //                            val formattedTime = dateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
 
-                            Text("Title: " + event.title)
-                            Text("Date: " + formatDate(event.start))
-                            if (!event.eventType.isNullOrBlank()){
-                                Text("Event Type: " + event.eventType)
+                                Text("Title: " + event.title)
+                                Text("Date: " + formatDate(event.start))
+                                if (!event.eventType.isNullOrBlank()) {
+                                    Text("Event Type: " + event.eventType)
+                                }
+                                if (!event.notes.isNullOrBlank()) {
+                                    Text("Notes: " + event.notes)
                             }
-                            if(!event.notes.isNullOrBlank()) {
-                                Text("Notes: " + event.notes)
-                            }
-
                         }
                     }
                 }
@@ -1665,52 +1736,61 @@ fun EventCard(
             .padding(vertical = 6.dp),
         elevation = CardDefaults.cardElevation(4.dp)
     ) {
-        Column(
-            modifier = Modifier.padding(12.dp)
-        ) {
-            Text(
-                text = event.title,
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Bold
-            )
-
-            Spacer(Modifier.height(4.dp))
-
-            if (!event.eventType.isNullOrBlank()) {
-                Text(
-                    text = "Event Type: " + event.eventType,
-                    fontSize = 14.sp
-                )
-            }
-
-            Text(
-                text = "Start: ${formatDate(event.start)}",
-                fontSize = 14.sp
-            )
-
-            event.end?.let {
-                Text(
-                    text = "End: ${formatDate(it)}",
-                    fontSize = 14.sp
-                )
-            }
-
-            if (!event.notes.isNullOrBlank()) {
-                Text(
-                    text = "Notes: " + event.notes,
-                    fontSize = 14.sp
-                )
-            }
-
-            if (onDelete != null) {
-                Spacer(Modifier.height(8.dp))
-                TextButton(
-                    onClick = { showConfirmDelete = true },
-                    colors = ButtonDefaults.textButtonColors(
-                        contentColor = MaterialTheme.colorScheme.error
-                    )
+        Row() {
+            Box() {
+                Column(
+                    modifier = Modifier.padding(12.dp)
                 ) {
-                    Text("Delete")
+                    Text(
+                        text = event.title,
+                        fontSize = 18.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                     Spacer(Modifier.height(4.dp))
+
+                    if (!event.eventType.isNullOrBlank()) {
+                        Text(
+                            text = "Event Type: " + event.eventType,
+                            fontSize = 14.sp
+                        )
+                    }
+                     Text(
+                         text = "Start: ${formatDate(event.start)}",
+                         fontSize = 14.sp
+                     )
+
+                    event.end?.let {
+                        Text(
+                            text = "End: ${formatDate(it)}",
+                            fontSize = 14.sp
+                        )
+                    }
+
+                    if (!event.notes.isNullOrBlank()) {
+                        Text(
+                            text = "Notes: " + event.notes,
+                            fontSize = 14.sp
+                        )
+                    }
+                }
+                Box(
+                    modifier = Modifier.align(Alignment.BottomEnd)
+                ) {
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalAlignment = Alignment.End
+                    ) {
+                        if (onDelete != null) {
+                            TextButton(
+                                onClick = { showConfirmDelete = true },
+                                colors = ButtonDefaults.textButtonColors(
+                                    contentColor = MaterialTheme.colorScheme.error
+                                )
+                            ) {
+                                Text("Delete")
+                            }
+                        }
+                    }
                 }
             }
         }
