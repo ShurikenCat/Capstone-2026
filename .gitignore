@@ -15,3 +15,8 @@
 local.properties
 /backend/__pycache__
 /backend/.venv
+.idea/misc.xml
+.idea/workspace.xml
+/build/
+/app/build/
+/.gradle/

@@ -57,6 +57,9 @@ import kotlinx.serialization.json.buildJsonObject
 import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.Image
 import androidx.compose.ui.res.painterResource
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Icon
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -353,10 +356,11 @@ fun AddJsonEvent(
             ) {
                 FloatingActionButton(
                     onClick = { showAddDialog = true },
-                    modifier = Modifier
-                        .padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ) {
-                    Text("+")
+                    Icon(Icons.Default.Add, contentDescription = "Add Event")
                 }
             }
         }
@@ -1698,8 +1702,10 @@ fun HomeScreen(
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
-                            Text(event.title)
-                            Text(event.start.toString())
+                            Text(text = cleanedEventTitle(event.title),
+                            fontWeight = FontWeight.Bold)
+                            Text(text = formatDate(event.start),
+                            fontSize = 14.sp)
                         }
                     }
                 }
@@ -1928,6 +1934,13 @@ fun formatDate(date: Date): String {
         SimpleDateFormat("MMM dd, yyyy • HH:mm", Locale.getDefault())
 
     return formatter.format(date)
+}
+
+fun cleanedEventTitle(title: String): String {
+    return title
+        .replace(Regex("""\b\d{8}T\d{6}Z\b"""), "")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
 }
 
 //@Preview(showBackground = true)
