@@ -72,6 +72,9 @@ import java.time.LocalDateTime
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material3.Icon
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -353,10 +356,11 @@ fun AddJsonEvent(
             ) {
                 FloatingActionButton(
                     onClick = { showAddDialog = true },
-                    modifier = Modifier
-                        .padding(bottom = 8.dp)
+                    modifier = Modifier.padding(bottom = 8.dp),
+                    containerColor = MaterialTheme.colorScheme.primary,
+                    contentColor = MaterialTheme.colorScheme.onPrimary
                 ) {
-                    Text("+")
+                    Icon(Icons.Default.Add, contentDescription = "Add Event")
                 }
             }
         }
@@ -1324,8 +1328,8 @@ fun MonthlyScheduleScreen(
     val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
     val currentMonth = remember { YearMonth.now() }
-    val startMonth = remember { currentMonth.minusMonths(12) }
-    val endMonth = remember { currentMonth.plusMonths(12) }
+    val startMonth = remember { currentMonth.minusYears(5) }
+    val endMonth = remember { currentMonth.plusYears(5) }
 
     val firstDayOfWeek = java.time.DayOfWeek.SUNDAY
     val daysOfWeek = remember { daysOfWeek(firstDayOfWeek) }
@@ -1336,6 +1340,21 @@ fun MonthlyScheduleScreen(
         firstVisibleMonth = currentMonth,
         firstDayOfWeek = firstDayOfWeek
     )
+
+    val scope = rememberCoroutineScope()
+
+    var showMonthYearPicker by remember { mutableStateOf(false) }
+    val visibleMonth = state.firstVisibleMonth.yearMonth
+
+    var selectedMonth by remember(showMonthYearPicker) { mutableStateOf(visibleMonth.monthValue) }
+    var selectedYear by remember(showMonthYearPicker) { mutableStateOf(visibleMonth.year) }
+
+    val monthNames = listOf(
+        "January", "February", "March", "April", "May", "June",
+        "July", "August", "September", "October", "November", "December"
+    )
+
+    val yearOptions = (startMonth.year..endMonth.year).toList()
 
     Box(
         modifier = Modifier
@@ -1351,12 +1370,19 @@ fun MonthlyScheduleScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            val visibleMonth = state.firstVisibleMonth.yearMonth
-            Text(
-                text = visibleMonth.month.name.lowercase().replaceFirstChar { it.uppercase() } +
-                        " ${visibleMonth.year}",
-                style = MaterialTheme.typography.titleMedium
-            )
+            TextButton(
+                onClick = {
+                    selectedMonth = visibleMonth.monthValue
+                    selectedYear = visibleMonth.year
+                    showMonthYearPicker = true
+                }
+            ) {
+                Text(
+                    text = visibleMonth.month.name.lowercase()
+                        .replaceFirstChar { it.uppercase() } + " ${visibleMonth.year}",
+                    style = MaterialTheme.typography.titleMedium
+                )
+            }
 
             Spacer(Modifier.height(4.dp))
 
@@ -1453,6 +1479,113 @@ fun MonthlyScheduleScreen(
             }
         }
     }
+
+    if (showMonthYearPicker) {
+        MonthYearPickerDialog(
+            initialMonth = selectedMonth,
+            initialYear = selectedYear,
+            monthNames = monthNames,
+            yearOptions = yearOptions,
+            onDismiss = { showMonthYearPicker = false },
+            onConfirm = { month, year ->
+                showMonthYearPicker = false
+                val targetMonth = YearMonth.of(year, month)
+                scope.launch {
+                    state.animateScrollToMonth(targetMonth)
+                }
+            }
+        )
+    }
+}
+
+@Composable
+fun MonthYearPickerDialog(
+    initialMonth: Int,
+    initialYear: Int,
+    monthNames: List<String>,
+    yearOptions: List<Int>,
+    onDismiss: () -> Unit,
+    onConfirm: (month: Int, year: Int) -> Unit
+) {
+    var selectedMonth by remember { mutableStateOf(initialMonth) }
+    var selectedYear by remember { mutableStateOf(initialYear) }
+
+    var monthExpanded by remember { mutableStateOf(false) }
+    var yearExpanded by remember { mutableStateOf(false) }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Choose Month and Year") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+                Text("Month")
+
+                Box {
+                    OutlinedButton(
+                        onClick = { monthExpanded = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(monthNames[selectedMonth - 1])
+                    }
+
+                    DropdownMenu(
+                        expanded = monthExpanded,
+                        onDismissRequest = { monthExpanded = false }
+                    ) {
+                        monthNames.forEachIndexed { index, monthName ->
+                            DropdownMenuItem(
+                                text = { Text(monthName) },
+                                onClick = {
+                                    selectedMonth = index + 1
+                                    monthExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                Text("Year")
+
+                Box {
+                    OutlinedButton(
+                        onClick = { yearExpanded = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(selectedYear.toString())
+                    }
+
+                    DropdownMenu(
+                        expanded = yearExpanded,
+                        onDismissRequest = { yearExpanded = false },
+                        modifier = Modifier.heightIn(max = 240.dp)
+                    ) {
+                        yearOptions.forEach { year ->
+                            DropdownMenuItem(
+                                text = { Text(year.toString()) },
+                                onClick = {
+                                    selectedYear = year
+                                    yearExpanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = { onConfirm(selectedMonth, selectedYear) }
+            ) {
+                Text("Go")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
 }
 
 @Composable
@@ -1509,17 +1642,12 @@ fun HomeScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                            Column(modifier = Modifier.padding(12.dp)) {
-//                            val formatter = DateTimeFormatter.ofPattern("yyyyMMdd'T'HHmmss")
-//                            val dateTime = LocalDateTime.parse(event.start.toString(), formatter)
-//                            val formattedTime = dateTime.format(DateTimeFormatter.ofPattern("HH:mm"))
-
-                                Text("Title: " + event.title)
-                                Text("Date: " + formatDate(event.start))
-                                if (!event.eventType.isNullOrBlank()) {
-                                    Text("Event Type: " + event.eventType)
-                                }
-                                if (!event.notes.isNullOrBlank()) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(text = cleanedEventTitle(event.title),
+                            fontWeight = FontWeight.Bold)
+                            Text(text = formatDate(event.start),
+                            fontSize = 14.sp)
+                            if (!event.notes.isNullOrBlank()) {
                                     Text("Notes: " + event.notes)
                             }
                         }
@@ -1814,6 +1942,13 @@ fun formatDate(date: Date): String {
         SimpleDateFormat("MMM dd, yyyy • HH:mm", Locale.getDefault())
 
     return formatter.format(date)
+}
+
+fun cleanedEventTitle(title: String): String {
+    return title
+        .replace(Regex("""\b\d{8}T\d{6}Z\b"""), "")
+        .replace(Regex("""\s+"""), " ")
+        .trim()
 }
 
 //@Preview(showBackground = true)
