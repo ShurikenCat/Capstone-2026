@@ -1462,21 +1462,10 @@ fun MonthlyScheduleScreen(
             )
         }
 
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            modifier = Modifier.fillMaxSize()
+        Box(
+            modifier = Modifier.align(Alignment.BottomEnd)
         ) {
-            Column(
-                horizontalAlignment = Alignment.Start
-            ) {
-                AddJsonEvent(allEvents)
-            }
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                AppMenu(navController)
-            }
+            AppMenu(navController)
         }
     }
 
