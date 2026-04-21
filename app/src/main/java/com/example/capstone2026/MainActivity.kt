@@ -1167,21 +1167,16 @@ fun DailyScheduleScreen(
                 }
             }
         }
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            modifier = Modifier.fillMaxSize()
+        Box(
+            modifier = Modifier.align(Alignment.BottomStart)
         ) {
-            Column(
-                horizontalAlignment = Alignment.Start
-            ) {
-                AddJsonEvent(allEvents)
-            }
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                AppMenu(navController)
-            }
+            AddJsonEvent(allEvents)
+        }
+
+        Box(
+            modifier = Modifier.align(Alignment.BottomEnd)
+        ) {
+            AppMenu(navController)
         }
     }
 }
@@ -1301,21 +1296,16 @@ fun WeeklyScheduleScreen(
             )
         }
 
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            modifier = Modifier.fillMaxSize()
+        Box(
+            modifier = Modifier.align(Alignment.BottomStart)
         ) {
-            Column(
-                horizontalAlignment = Alignment.Start
-            ) {
-                AddJsonEvent(allEvents)
-            }
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                AppMenu(navController)
-            }
+            AddJsonEvent(allEvents)
+        }
+
+        Box(
+            modifier = Modifier.align(Alignment.BottomEnd)
+        ) {
+            AppMenu(navController)
         }
     }
 }
@@ -1349,6 +1339,8 @@ fun MonthlyScheduleScreen(
     var selectedMonth by remember(showMonthYearPicker) { mutableStateOf(visibleMonth.monthValue) }
     var selectedYear by remember(showMonthYearPicker) { mutableStateOf(visibleMonth.year) }
 
+    var selectedDate by remember { mutableStateOf<LocalDate?>(null) }
+
     val monthNames = listOf(
         "January", "February", "March", "April", "May", "June",
         "July", "August", "September", "October", "November", "December"
@@ -1359,7 +1351,7 @@ fun MonthlyScheduleScreen(
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .padding(16.dp)
+            .padding(horizontal = 8.dp, vertical = 8.dp)
     ) {
         Column(modifier = Modifier.fillMaxSize()) {
 
@@ -1405,78 +1397,126 @@ fun MonthlyScheduleScreen(
 
             Spacer(Modifier.height(4.dp))
 
-            HorizontalCalendar(
-                state = state,
-                dayContent = { day ->
-                    val date = day.date
-                    val hasEvents = eventsByDate[date]?.isNotEmpty() == true
-                    val isToday = date == LocalDate.now()
-                    val isCurrentMonth = date.month == visibleMonth.month
+            Box(
+                modifier = Modifier
+                    .weight(1f)
+                    .fillMaxWidth()
+            ) {
+                HorizontalCalendar(
+                    state = state,
+                    modifier = Modifier.fillMaxSize(),
+                    dayContent = { day ->
+                        val date = day.date
+                        val hasEvents = eventsByDate[date]?.isNotEmpty() == true
+                        val isToday = date == LocalDate.now()
+                        val isCurrentMonth = date.month == visibleMonth.month
 
-                    Surface(
-                        modifier = Modifier
-                            .padding(2.dp)
-                            .aspectRatio(1f)
-                            .clickable {
-                                navController.navigate("schedule_daily/$date")
-                            },
-                        shape = RoundedCornerShape(4.dp),
-                        color = when {
-                            isToday -> MaterialTheme.colorScheme.primaryContainer
-                            !isCurrentMonth -> MaterialTheme.colorScheme.surfaceVariant
-                            else -> MaterialTheme.colorScheme.surface
-                        },
-                        tonalElevation = if (hasEvents) 2.dp else 0.dp
-                    ) {
-                        Column(
+                        Surface(
                             modifier = Modifier
-                                .fillMaxSize()
-                                .padding(4.dp),
-                            verticalArrangement = Arrangement.Top,
-                            horizontalAlignment = Alignment.Start
+                                .padding(1.dp)
+                                .aspectRatio(1f)
+                                .clickable {
+                                    selectedDate = date
+                                },
+                            shape = RoundedCornerShape(4.dp),
+                            color = when {
+                                isToday -> MaterialTheme.colorScheme.primaryContainer
+                                !isCurrentMonth -> MaterialTheme.colorScheme.surfaceVariant
+                                else -> MaterialTheme.colorScheme.surface
+                            },
+                            tonalElevation = if (hasEvents) 2.dp else 0.dp
                         ) {
-                            Text(
-                                text = date.dayOfMonth.toString(),
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (isCurrentMonth)
-                                    MaterialTheme.colorScheme.onSurface
-                                else
-                                    MaterialTheme.colorScheme.outline
-                            )
-
-                            if (hasEvents) {
-                                Spacer(Modifier.height(2.dp))
-                                Box(
-                                    modifier = Modifier
-                                        .size(6.dp)
-                                        .align(Alignment.CenterHorizontally)
-                                        .background(
-                                            color = MaterialTheme.colorScheme.primary,
-                                            shape = CircleShape
-                                        )
+                            Column(
+                                modifier = Modifier
+                                    .fillMaxSize()
+                                    .padding(4.dp),
+                                verticalArrangement = Arrangement.Top,
+                                horizontalAlignment = Alignment.Start
+                            ) {
+                                Text(
+                                    text = date.dayOfMonth.toString(),
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = if (isCurrentMonth)
+                                        MaterialTheme.colorScheme.onSurface
+                                    else
+                                        MaterialTheme.colorScheme.outline
                                 )
+
+                                if (hasEvents) {
+                                    Spacer(Modifier.height(2.dp))
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .align(Alignment.CenterHorizontally)
+                                            .background(
+                                                color = MaterialTheme.colorScheme.primary,
+                                                shape = CircleShape
+                                            )
+                                    )
+                                }
                             }
                         }
                     }
-                }
-            )
-        }
+                )
+            }
+            selectedDate?.let { date ->
 
-        Row(
-            verticalAlignment = Alignment.Bottom,
-            modifier = Modifier.fillMaxSize()
+                val eventsForDay = allEvents
+                    .filter { it.start.toLocalDate() == date }
+                    .sortedBy { it.start }
+
+                val selectedDateFormatted = date.format(
+                    DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy")
+                )
+                Spacer(Modifier.height(8.dp))
+
+                Card(
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Column(
+                        modifier = Modifier.padding(12.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+
+                        Text(
+                            text = selectedDateFormatted,
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+
+                        if (eventsForDay.isEmpty()) {
+                            Text("No events for this day")
+                        } else {
+                            eventsForDay.take(3).forEach { event ->
+                                Text("• ${cleanedEventTitle(event.title)}")
+                                Text(
+                                    text = formatDate(event.start),
+                                    style = MaterialTheme.typography.bodySmall
+                                )
+                            }
+
+                            if (eventsForDay.size > 3) {
+                                Text("+ ${eventsForDay.size - 3} more")
+                            }
+                        }
+
+                        Spacer(Modifier.height(4.dp))
+
+                        TextButton(
+                            onClick = {
+                                navController.navigate("schedule_daily/$date")
+                            }
+                        ) {
+                            Text("Open Daily View")
+                        }
+                    }
+                }
+            }
+        }
+        Box(
+            modifier = Modifier.align(Alignment.BottomEnd)
         ) {
-            Column(
-                horizontalAlignment = Alignment.Start
-            ) {
-                AddJsonEvent(allEvents)
-            }
-            Column(
-                horizontalAlignment = Alignment.End,
-                modifier = Modifier.fillMaxWidth()
-            ) {
-                AppMenu(navController)
-            }
+            AppMenu(navController)
         }
     }
 
