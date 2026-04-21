@@ -1514,6 +1514,12 @@ fun MonthlyScheduleScreen(
             }
         }
         Box(
+            modifier = Modifier.align(Alignment.BottomStart)
+        ) {
+            AddJsonEvent(allEvents)
+        }
+
+        Box(
             modifier = Modifier.align(Alignment.BottomEnd)
         ) {
             AppMenu(navController)
