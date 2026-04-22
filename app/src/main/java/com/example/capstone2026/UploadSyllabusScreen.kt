@@ -32,7 +32,9 @@ import androidx.compose.ui.text.style.TextAlign
 @Composable
 fun UploadSyllabusScreen(
     navController: NavController,
-    onImportEvents: (List<EventDto>) -> Unit
+    onImportEvents: (List<EventDto>) -> Unit,
+    onUndoLastImport: () -> Unit,
+    canUndoLastImport: Boolean
 ) {
     val scope = rememberCoroutineScope()
     val context = LocalContext.current
@@ -41,6 +43,7 @@ fun UploadSyllabusScreen(
     var loading by remember { mutableStateOf(false) }
     var events by remember { mutableStateOf<List<EventDto>>(emptyList()) }
     var extractionSource by remember { mutableStateOf<String?>(null) }
+    var courseTitle by remember { mutableStateOf<String?>(null) }
 
     val picker = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument(),
@@ -59,6 +62,7 @@ fun UploadSyllabusScreen(
                 loading = true
                 status = "Uploading syllabus..."
                 events = emptyList()
+                courseTitle = null
                 extractionSource = null
 
                 try {
@@ -69,6 +73,7 @@ fun UploadSyllabusScreen(
                     val response = ApiClient.api.extractSyllabus(part)
                     events = response.events.sortedBy { it.date }
                     extractionSource = response.source
+                    courseTitle = response.course_title
 
                     status = if (response.count > 0) {
                         "✅ Extracted ${response.count} events"
@@ -97,6 +102,13 @@ fun UploadSyllabusScreen(
             Text("Upload Syllabus", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(8.dp))
             Text(status)
+            courseTitle?.let { title ->
+                Text(
+                    text = "Class: $title",
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(Modifier.height(8.dp))
+            }
             extractionSource?.let { source ->
                 val sourceLabel = when (source) {
                     "rules" -> "Rule-based extraction"
@@ -119,6 +131,19 @@ fun UploadSyllabusScreen(
                 enabled = !loading
             ) {
                 Text(if (loading) "Working..." else "Pick PDF")
+            }
+            Spacer(Modifier.height(12.dp))
+
+            if (canUndoLastImport) {
+                OutlinedButton(
+                    onClick = onUndoLastImport,
+                    enabled = !loading,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Undo Last Import")
+                }
+
+                Spacer(Modifier.height(12.dp))
             }
 
             Spacer(Modifier.height(16.dp))
@@ -222,15 +247,7 @@ fun EventDto.toCalendarEvent(): CalendarEvent? {
 
         val beginCalendar = Calendar.getInstance().apply {
             time = parsedDate
-            set(Calendar.HOUR_OF_DAY, 9)
-            set(Calendar.MINUTE, 0)
-            set(Calendar.SECOND, 0)
-            set(Calendar.MILLISECOND, 0)
-        }
-
-        val endCalendar = Calendar.getInstance().apply {
-            time = parsedDate
-            set(Calendar.HOUR_OF_DAY, 10)
+            set(Calendar.HOUR_OF_DAY, 0)
             set(Calendar.MINUTE, 0)
             set(Calendar.SECOND, 0)
             set(Calendar.MILLISECOND, 0)
@@ -247,7 +264,8 @@ fun EventDto.toCalendarEvent(): CalendarEvent? {
         CalendarEvent(
             title = title,
             start = beginCalendar.time,
-            end = endCalendar.time
+            end = null,
+            isAllDay = true
         )
     } catch (e: Exception) {
         e.printStackTrace()

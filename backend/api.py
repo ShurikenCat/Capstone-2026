@@ -29,6 +29,7 @@ async def extract(file: UploadFile = File(...)):
 
         events = result.get("events", [])
         source = result.get("source", "unknown")
+        course_title = result.get("course_title")
 
         for event in events:
             if "date" in event and event["date"] is not None:
@@ -37,7 +38,8 @@ async def extract(file: UploadFile = File(...)):
         return {
             "count": len(events),
             "events": events,
-            "source": source
+            "source": source,
+            "course_title": course_title
         }
 
     finally:

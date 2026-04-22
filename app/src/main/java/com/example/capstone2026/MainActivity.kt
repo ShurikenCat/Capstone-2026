@@ -1,7 +1,6 @@
 package com.example.capstone2026
 
 import android.content.Context
-import android.graphics.Paint
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -16,27 +15,20 @@ import androidx.compose.foundation.shape.*
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
-import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.*
 import androidx.compose.runtime.snapshots.SnapshotStateList
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.sp
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.text.TextRange
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.lifecycleScope
 import androidx.navigation.NavController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
-import androidx.room.util.TableInfo
 import com.example.capstone2026.ui.theme.Capstone2026Theme
 import com.example.capstone2026.ui.theme.ThemeMode
 import com.example.capstone2026.ui.theme.readThemeMode
@@ -57,18 +49,11 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.ZoneId
 import java.util.*
-import kotlinx.serialization.encodeToString
-import kotlinx.serialization.decodeFromString
-import kotlinx.serialization.json.buildJsonObject
 import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.Image
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
-import androidx.compose.ui.text.style.LineHeightStyle
 import java.time.DayOfWeek
-import kotlin.time.Duration.Companion.hours
-import kotlin.time.Duration.Companion.minutes
-import java.time.LocalDateTime
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 
@@ -206,6 +191,9 @@ fun AppNavGraph(
         mutableStateListOf<CalendarEvent>().apply { addAll(initialEvents) }
     }
 
+    var focusedDate by remember { mutableStateOf(LocalDate.now())}
+    var lastImportedEvents by remember { mutableStateOf<List<CalendarEvent>>(emptyList())}
+
     NavHost(
         navController = navController,
         startDestination = "home",
@@ -225,46 +213,85 @@ fun AppNavGraph(
         }
         composable("upload") {
             UploadSyllabusScreen(
-                navController,
+                navController = navController,
                 onImportEvents = { extractedEvents ->
                     val converted = extractedEvents.mapNotNull { it.toCalendarEvent() }
+
+                    val actuallyAdded = mutableListOf<CalendarEvent>()
 
                     converted.forEach { newEvent ->
                         val alreadyExists = allEvents.any { existing ->
                             existing.title == newEvent.title &&
-                            existing.start.time == newEvent.start.time
+                                    existing.start.time == newEvent.start.time
                         }
 
                         if (!alreadyExists) {
                             allEvents.add(newEvent)
+                            actuallyAdded.add(newEvent)
                         }
                     }
 
+                    lastImportedEvents = actuallyAdded
                     saveEventsToIcs(context, allEvents)
-                }
+                },
+                onUndoLastImport = {
+                    if (lastImportedEvents.isNotEmpty()) {
+                        allEvents.removeAll(lastImportedEvents.toSet())
+                        saveEventsToIcs(context, allEvents)
+                        lastImportedEvents = emptyList()
+                    }
+                },
+                canUndoLastImport = lastImportedEvents.isNotEmpty()
             )
         }
 
         // this is the default schedule
         composable("schedule") {
-            WeeklyScheduleScreen(navController, allEvents)
+            MonthlyScheduleScreen(
+                navController = navController,
+                allEvents = allEvents,
+                focusedDate = focusedDate,
+                onFocusedDateChange = { focusedDate = it }
+            )
         }
 
         composable("schedule_daily") {
-            DailyScheduleScreen(navController, allEvents)
+            DailyScheduleScreen(
+                navController = navController,
+                allEvents = allEvents,
+                initialDate = focusedDate,
+                onFocusedDateChange = { focusedDate = it }
+            )
         }
 
         composable("schedule_daily/{date}") { backStackEntry ->
             val dateArg = backStackEntry.arguments?.getString("date")
-            DailyScheduleScreen(navController, allEvents, dateArg)
+            val parsedDate = dateArg?.let { LocalDate.parse(it) } ?: focusedDate
+
+            DailyScheduleScreen(
+                navController = navController,
+                allEvents = allEvents,
+                initialDate = parsedDate,
+                onFocusedDateChange = { focusedDate = it }
+            )
         }
 
         composable("schedule_weekly") {
-            WeeklyScheduleScreen(navController, allEvents)
+            WeeklyScheduleScreen(
+                navController = navController,
+                allEvents = allEvents,
+                focusedDate = focusedDate,
+                onFocusedDateChange = { focusedDate = it }
+            )
         }
 
         composable("schedule_monthly") {
-            MonthlyScheduleScreen(navController, allEvents)
+            MonthlyScheduleScreen(
+                navController = navController,
+                allEvents = allEvents,
+                focusedDate = focusedDate,
+                onFocusedDateChange = { focusedDate = it }
+            )
         }
 
         composable("settings") {
@@ -276,62 +303,6 @@ fun AppNavGraph(
         }
     }
 }
-
-//@Composable
-//fun ScheduleScreen(navController: NavController) {
-//
-//    val context = LocalContext.current
-//
-//    // Load events once
-//    val events by remember {
-//        mutableStateOf(
-//            try {
-//                val input = loadIcsFromAssets(context, "schedule.ics")
-//                parseIcsFile(input)
-//            } catch (e: Exception) {
-//                e.printStackTrace()
-//                emptyList()
-//            }
-//        )
-//    }
-//
-//    Box(
-//        modifier = Modifier
-//            .fillMaxSize()
-//            .padding(16.dp)
-//    ) {
-//        Column(
-//            modifier = Modifier.fillMaxSize()
-//        ) {
-//            if (events.isEmpty()) {
-//                Box(
-//                    modifier = Modifier
-//                        .fillMaxWidth()
-//                        .weight(1f),
-//                    contentAlignment = Alignment.Center
-//                ) {
-//                    Text("No events found")
-//                }
-//            } else {
-//                LazyColumn(
-//                    modifier = Modifier
-//                        .fillMaxWidth()
-//                        .weight(1f)
-//                ) {
-//                    items(events) { event: CalendarEvent ->
-//                        EventCard(event)
-//                    }
-//                }
-//            }
-//        }
-//
-//        Box(
-//            modifier = Modifier.align(Alignment.BottomEnd)
-//        ) {
-//            AppMenu(navController)
-//        }
-//    }
-//}
 @Composable
 fun AddJsonEvent(
     allEvents: SnapshotStateList<CalendarEvent>,
@@ -344,6 +315,7 @@ fun AddJsonEvent(
     }
 
     var selectedDate by remember { mutableStateOf(initialDate) }
+
     var showAddDialog by remember { mutableStateOf(false) }
 
 
@@ -402,6 +374,8 @@ fun AddJsonEvent(
                 }
             )
         }
+
+
     }
 }
 
@@ -432,6 +406,7 @@ fun AddEventJson(
     var inflexible by remember { mutableStateOf("True") }
     var notes by remember { mutableStateOf("") }
     var startDateText by remember { mutableStateOf(selectedDate.toString()) }
+    var timeError by remember { mutableStateOf<String?>(null) }
     val parsedStartDate = try {
         LocalDate.parse(startDateText)
     } catch (e: Exception) {
@@ -515,17 +490,6 @@ fun AddEventJson(
         return h
     }
 
-    // Format raw digits into HH:MM with clamped hour/minute
-    fun formatWithColon(raw: String): String {
-        val digits = raw.filter { it.isDigit() }.take(4)
-        if (digits.isEmpty()) return ""
-        val padded = digits.padStart(4, '0')
-        val hRaw = padded.substring(0, 2).toInt()
-        val h = clampHour12(hRaw)
-        val mRaw = padded.substring(2, 4).toInt()
-        val m = clampMinutes(mRaw)
-        return "${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}"
-    }
 
     // Parse raw digits + AM/PM into LocalTime
     fun parseTime12h(hrStr: String, minStr: String, amPm: String): java.time.LocalTime {
@@ -559,7 +523,7 @@ fun AddEventJson(
                     onValueChange = {
                         startDateText = it
                     },
-                    label = { Text("Start Date (yyyy-MM-dd)") },
+                    label = { Text("Start Date (yyyy-mm-dd)") },
                     isError = parsedStartDate == null,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -571,7 +535,7 @@ fun AddEventJson(
                     onValueChange = {
                         endDateText = it
                     },
-                    label = { Text("End Date (yyyy-MM-dd)") },
+                    label = { Text("End Date (yyyy-mm-dd)") },
                     isError = parsedEndDate == null,
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -915,6 +879,14 @@ fun AddEventJson(
                         }
                     }
                 }
+                timeError?.let {
+                    Spacer(Modifier.height(8.dp))
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
 
                 Spacer(Modifier.width(8.dp))
 
@@ -941,6 +913,17 @@ fun AddEventJson(
                         onDismiss()
                         return@TextButton
                     }
+
+                    val startLocalTime = parseTime12h(startHr, startMin, startAmPm)
+                    val endLocalTime = parseTime12h(endHr, endMin, endAmPm)
+
+                    if (!endLocalTime.isAfter(startLocalTime)) {
+                        timeError = "End time must be later than start time"
+                        return@TextButton
+                    } else {
+                        timeError = null
+                    }
+
                     val repeated = sunText + monText + tueText + wedText + thuText + friText + satText
 
                     val jsonEvent = CalendarEventJson(
@@ -951,48 +934,37 @@ fun AddEventJson(
                         startDate = startDateText,
                         endDate = endDateText,
                         startTime = "$startHr:$startMin $startAmPm",
-                        endTime = if (parsedStartDate.isAfter(parsedEndDate)) {
-                            "${startHr}Hr:$startMin $startAmPm"
-                        } else {
-                            "$endHr:$endMin $endAmPm"
-                        },
-                        repeated = if(repeated == "") {
-                            null
-                        } else {
-                            repeated
-                        }
+                        endTime = "$endHr:$endMin $endAmPm",
+                        repeated = if (repeated == "") null else repeated
                     )
+
                     val zoneId = ZoneId.systemDefault()
 
-                    val startLocalTime = parseTime12h(startHr, startMin, startAmPm)
-                    val endLocalTime = parseTime12h(endHr, endMin, endAmPm)
-
-                    // Helper to build one CalendarEvent for a given LocalDate
                     fun buildEventForDate(date: LocalDate): CalendarEvent {
                         val startInstant = date.atTime(startLocalTime)
                             .atZone(zoneId)
                             .toInstant()
                         val startDate = Date.from(startInstant)
 
-                        val endDate = endLocalTime?.let { lt ->
-                            val endInstant = date.atTime(lt)
-                                .atZone(zoneId)
-                                .toInstant()
-                            Date.from(endInstant)
-                        }
+                        val endInstant = date.atTime(endLocalTime)
+                            .atZone(zoneId)
+                            .toInstant()
+                        val endDate = Date.from(endInstant)
 
                         return CalendarEvent(
                             title = title,
                             start = startDate,
                             end = endDate,
                             eventType = eventType.ifBlank { null },
-                            notes = notes.ifBlank { null }
+                            notes = notes.ifBlank { null },
+                            isAllDay = false
                         )
                     }
 
                     val results = mutableListOf<CalendarEvent>()
                     results.add(buildEventForDate(LocalDate.parse(startDateText)))
-                    if(sat) {
+
+                    if (sat) {
                         var current = parsedStartDate.plusDays(1)
                         while (current.dayOfWeek != DayOfWeek.SATURDAY) {
                             current = current.plusDays(1)
@@ -1002,7 +974,7 @@ fun AddEventJson(
                             current = current.plusWeeks(1)
                         }
                     }
-                    if(mon) {
+                    if (mon) {
                         var current = parsedStartDate.plusDays(1)
                         while (current.dayOfWeek != DayOfWeek.MONDAY) {
                             current = current.plusDays(1)
@@ -1012,7 +984,7 @@ fun AddEventJson(
                             current = current.plusWeeks(1)
                         }
                     }
-                    if(tue) {
+                    if (tue) {
                         var current = parsedStartDate.plusDays(1)
                         while (current.dayOfWeek != DayOfWeek.TUESDAY) {
                             current = current.plusDays(1)
@@ -1022,7 +994,7 @@ fun AddEventJson(
                             current = current.plusWeeks(1)
                         }
                     }
-                    if(wed) {
+                    if (wed) {
                         var current = parsedStartDate.plusDays(1)
                         while (current.dayOfWeek != DayOfWeek.WEDNESDAY) {
                             current = current.plusDays(1)
@@ -1032,7 +1004,7 @@ fun AddEventJson(
                             current = current.plusWeeks(1)
                         }
                     }
-                    if(thu) {
+                    if (thu) {
                         var current = parsedStartDate.plusDays(1)
                         while (current.dayOfWeek != DayOfWeek.THURSDAY) {
                             current = current.plusDays(1)
@@ -1042,7 +1014,7 @@ fun AddEventJson(
                             current = current.plusWeeks(1)
                         }
                     }
-                    if(fri) {
+                    if (fri) {
                         var current = parsedStartDate.plusDays(1)
                         while (current.dayOfWeek != DayOfWeek.FRIDAY) {
                             current = current.plusDays(1)
@@ -1052,7 +1024,7 @@ fun AddEventJson(
                             current = current.plusWeeks(1)
                         }
                     }
-                    if(sun) {
+                    if (sun) {
                         var current = parsedStartDate.plusDays(1)
                         while (current.dayOfWeek != DayOfWeek.SUNDAY) {
                             current = current.plusDays(1)
@@ -1063,12 +1035,7 @@ fun AddEventJson(
                         }
                     }
 
-                    val events: List<CalendarEvent> = results
-
-                    onSave(
-                        jsonEvent,
-                        events
-                    )
+                    onSave(jsonEvent, results)
                 } catch (e: Exception) {
                     e.printStackTrace()
                     onDismiss()
@@ -1089,16 +1056,16 @@ fun AddEventJson(
 fun DailyScheduleScreen(
     navController: NavController,
     allEvents: SnapshotStateList<CalendarEvent>,
-    dateArg: String? = null
+    initialDate: LocalDate,
+    onFocusedDateChange: (LocalDate) -> Unit
 ) {
     val context = LocalContext.current
 
-    val initialDate = remember(dateArg) {
-        dateArg?.let { LocalDate.parse(it) } ?: LocalDate.now()
-    }
-
     var selectedDate by remember { mutableStateOf(initialDate) }
-    var showAddDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(selectedDate) {
+        onFocusedDateChange(selectedDate)
+    }
+    var editingEvent by remember { mutableStateOf<CalendarEvent?>(null) }
 
     val eventsForDay =
         allEvents
@@ -1124,16 +1091,21 @@ fun DailyScheduleScreen(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 modifier = Modifier.fillMaxWidth()
             ) {
-                TextButton(onClick = { selectedDate = selectedDate.minusDays(1) }) {
+                TextButton(onClick = { 
+                    selectedDate = selectedDate.minusDays(1)
+                    onFocusedDateChange(selectedDate) 
+                    }) {
                     Text("<")
                 }
 
                 Text(
-                    text = selectedDate.toString(),
+                    text = formatFullLocalDate(selectedDate),
                     style = MaterialTheme.typography.titleMedium
                 )
 
-                TextButton(onClick = { selectedDate = selectedDate.plusDays(1) }) {
+                TextButton(onClick = { 
+                    selectedDate = selectedDate.plusDays(1)
+                    onFocusedDateChange(selectedDate)  }) {
                     Text(">")
                 }
             }
@@ -1158,6 +1130,9 @@ fun DailyScheduleScreen(
                     items(eventsForDay) { event ->
                         EventCard(
                             event = event,
+                            onEdit = {
+                                editingEvent = it
+                            },
                             onDelete = {
                                 allEvents.remove(event)
                                 saveEventsToIcs(context, allEvents)
@@ -1179,16 +1154,32 @@ fun DailyScheduleScreen(
             AppMenu(navController)
         }
     }
+    editingEvent?.let { eventToEdit ->
+        EditEventDialog(
+            event = eventToEdit,
+            onDismiss = { editingEvent = null },
+            onSave = { updatedEvent ->
+                val index = allEvents.indexOf(eventToEdit)
+                if (index != -1) {
+                    allEvents[index] = updatedEvent
+                    saveEventsToIcs(context, allEvents)
+                }
+                editingEvent = null
+            }
+        )
+    }
 }
 
 @Composable
 fun WeeklyScheduleScreen(
     navController: NavController,
-    allEvents: SnapshotStateList<CalendarEvent>
+    allEvents: SnapshotStateList<CalendarEvent>,
+    focusedDate: LocalDate,
+    onFocusedDateChange: (LocalDate) -> Unit
 ) {
     val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
-    val today = remember { LocalDate.now() }
+    val today = focusedDate
 
     val firstDayOfWeek = java.time.DayOfWeek.SUNDAY
     val daysOfWeek = remember { daysOfWeek(firstDayOfWeek) }
@@ -1199,6 +1190,10 @@ fun WeeklyScheduleScreen(
         firstVisibleWeekDate = today,
         firstDayOfWeek = firstDayOfWeek
     )
+
+    LaunchedEffect(state.firstVisibleWeek.days.first().date) {
+        onFocusedDateChange(state.firstVisibleWeek.days.first().date)
+    }
 
     Box(
         modifier = Modifier
@@ -1217,7 +1212,7 @@ fun WeeklyScheduleScreen(
             val visibleWeek = state.firstVisibleWeek
             val weekStart = visibleWeek.days.first().date
             Text(
-                text = "Week of $weekStart",
+                text = "Week of ${formatWeekRange(weekStart)}",
                 style = MaterialTheme.typography.titleMedium
             )
 
@@ -1313,11 +1308,13 @@ fun WeeklyScheduleScreen(
 @Composable
 fun MonthlyScheduleScreen(
     navController: NavController,
-    allEvents: SnapshotStateList<CalendarEvent>
+    allEvents: SnapshotStateList<CalendarEvent>,
+    focusedDate: LocalDate,
+    onFocusedDateChange: (LocalDate) -> Unit
 ) {
     val eventsByDate = allEvents.groupBy { it.start.toLocalDate() }
 
-    val currentMonth = remember { YearMonth.now() }
+    val currentMonth = remember(focusedDate) { YearMonth.from(focusedDate) }
     val startMonth = remember { currentMonth.minusYears(5) }
     val endMonth = remember { currentMonth.plusYears(5) }
 
@@ -1362,18 +1359,38 @@ fun MonthlyScheduleScreen(
 
             Spacer(Modifier.height(8.dp))
 
-            TextButton(
-                onClick = {
-                    selectedMonth = visibleMonth.monthValue
-                    selectedYear = visibleMonth.year
-                    showMonthYearPicker = true
-                }
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = visibleMonth.month.name.lowercase()
-                        .replaceFirstChar { it.uppercase() } + " ${visibleMonth.year}",
-                    style = MaterialTheme.typography.titleMedium
-                )
+                TextButton(
+                    onClick = {
+                        selectedMonth = visibleMonth.monthValue
+                        selectedYear = visibleMonth.year
+                        showMonthYearPicker = true
+                    }
+                ) {
+                    Text(
+                        text = formatMonthYear(visibleMonth),
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = {
+                        val today = LocalDate.now()
+                        val todayMonth = YearMonth.from(today)
+                        selectedDate = today
+                        onFocusedDateChange(today)
+
+                        scope.launch {
+                            state.animateScrollToMonth(todayMonth)
+                        }
+                    }
+                ) {
+                    Text("Today")
+                }
             }
 
             Spacer(Modifier.height(4.dp))
@@ -1417,6 +1434,7 @@ fun MonthlyScheduleScreen(
                                 .aspectRatio(1f)
                                 .clickable {
                                     selectedDate = date
+                                    onFocusedDateChange(date)
                                 },
                             shape = RoundedCornerShape(4.dp),
                             color = when {
@@ -1504,6 +1522,7 @@ fun MonthlyScheduleScreen(
 
                         TextButton(
                             onClick = {
+                                onFocusedDateChange(date)
                                 navController.navigate("schedule_daily/$date")
                             }
                         ) {
@@ -1530,6 +1549,7 @@ fun MonthlyScheduleScreen(
             onConfirm = { month, year ->
                 showMonthYearPicker = false
                 val targetMonth = YearMonth.of(year, month)
+                onFocusedDateChange(targetMonth.atDay(1))
                 scope.launch {
                     state.animateScrollToMonth(targetMonth)
                 }
@@ -1685,7 +1705,7 @@ fun HomeScreen(
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(text = cleanedEventTitle(event.title),
                             fontWeight = FontWeight.Bold)
-                            Text(text = formatDate(event.start),
+                            Text(text = formatEventDate(event),
                             fontSize = 14.sp)
                             if (!event.notes.isNullOrBlank()) {
                                     Text("Notes: " + event.notes)
@@ -1891,9 +1911,147 @@ fun ConfirmDelete(
 }
 
 @Composable
+fun EditEventDialog(
+    event: CalendarEvent,
+    onDismiss: () -> Unit,
+    onSave: (CalendarEvent) -> Unit
+) {
+    var title by remember { mutableStateOf(event.title) }
+    var eventType by remember { mutableStateOf(event.eventType ?: "") }
+    var notes by remember { mutableStateOf(event.notes ?: "") }
+    var timeError by remember { mutableStateOf<String?>(null) }
+
+    val startLocal = event.start.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()
+    val endLocal = event.end?.toInstant()?.atZone(ZoneId.systemDefault())?.toLocalDateTime()
+
+    var dateText by remember { mutableStateOf(startLocal.toLocalDate().toString()) }
+    var startHour by remember { mutableStateOf(startLocal.hour.toString().padStart(2, '0')) }
+    var startMinute by remember { mutableStateOf(startLocal.minute.toString().padStart(2, '0')) }
+
+    var endHour by remember {
+        mutableStateOf(endLocal?.hour?.toString()?.padStart(2, '0') ?: "23")
+    }
+    var endMinute by remember {
+        mutableStateOf(endLocal?.minute?.toString()?.padStart(2, '0') ?: "59")
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Edit Event") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = title,
+                    onValueChange = { title = it },
+                    label = { Text("Title") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = dateText,
+                    onValueChange = { dateText = it },
+                    label = { Text("Date (yyyy-MM-dd)") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = startHour,
+                        onValueChange = { startHour = it.filter(Char::isDigit).take(2) },
+                        label = { Text("Start Hr") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = startMinute,
+                        onValueChange = { startMinute = it.filter(Char::isDigit).take(2) },
+                        label = { Text("Start Min") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = endHour,
+                        onValueChange = { endHour = it.filter(Char::isDigit).take(2) },
+                        label = { Text("End Hr") },
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = endMinute,
+                        onValueChange = { endMinute = it.filter(Char::isDigit).take(2) },
+                        label = { Text("End Min") },
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+                timeError?.let {
+                    Text(
+                        text = it,
+                        color = MaterialTheme.colorScheme.error,
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+
+                OutlinedTextField(
+                    value = eventType,
+                    onValueChange = { eventType = it },
+                    label = { Text("Event Type") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
+                    value = notes,
+                    onValueChange = { notes = it },
+                    label = { Text("Notes") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    try {
+                        val date = LocalDate.parse(dateText)
+                        val startDateTime = date.atTime(startHour.toInt(), startMinute.toInt())
+                        val endDateTime = date.atTime(endHour.toInt(), endMinute.toInt())
+
+                        if (!endDateTime.isAfter(startDateTime)) {
+                            timeError = "End time must be later than start time"
+                            return@TextButton
+                        } else {
+                            timeError = null
+                        }
+
+                        val updatedEvent = CalendarEvent(
+                            title = title,
+                            start = Date.from(startDateTime.atZone(ZoneId.systemDefault()).toInstant()),
+                            end = Date.from(endDateTime.atZone(ZoneId.systemDefault()).toInstant()),
+                            eventType = eventType.ifBlank { null },
+                            notes = notes.ifBlank { null },
+                            isAllDay = false
+                        )
+
+                        onSave(updatedEvent)
+                    } catch (e: Exception) {
+                        e.printStackTrace()
+                    }
+                }
+            ) {
+                Text("Save")
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
+        }
+    )
+}
+
+@Composable
 fun EventCard(
     event: CalendarEvent,
-    onDelete: (() -> Unit)? = null
+    onDelete: (() -> Unit)? = null,
+    onEdit: ((CalendarEvent) -> Unit)? = null
 ) {
 
     var showConfirmDelete by remember { mutableStateOf(false) }
@@ -1923,7 +2081,7 @@ fun EventCard(
                         )
                     }
                      Text(
-                         text = "Start: ${formatDate(event.start)}",
+                         text = "Start: ${formatEventDate(event)}",
                          fontSize = 14.sp
                      )
 
@@ -1948,14 +2106,24 @@ fun EventCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalAlignment = Alignment.End
                     ) {
-                        if (onDelete != null) {
-                            TextButton(
-                                onClick = { showConfirmDelete = true },
-                                colors = ButtonDefaults.textButtonColors(
-                                    contentColor = MaterialTheme.colorScheme.error
-                                )
-                            ) {
-                                Text("Delete")
+                        Row {
+                            if (onEdit != null) {
+                                TextButton(
+                                    onClick = { onEdit(event) }
+                                ) {
+                                    Text("Edit")
+                                }
+                            }
+
+                            if (onDelete != null) {
+                                TextButton(
+                                    onClick = { showConfirmDelete = true },
+                                    colors = ButtonDefaults.textButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Text("Delete")
+                                }
                             }
                         }
                     }
@@ -1983,6 +2151,26 @@ fun formatDate(date: Date): String {
 
     return formatter.format(date)
 }
+fun formatEventDate(event: CalendarEvent): String {
+    return if (event.isAllDay) {
+        SimpleDateFormat("MMM dd, yyyy", Locale.getDefault()).format(event.start) + " • All day"
+    } else {
+        SimpleDateFormat("MMM dd, yyyy • HH:mm", Locale.getDefault()).format(event.start)
+    }
+}
+fun formatFullLocalDate(date: LocalDate): String {
+    return date.format(DateTimeFormatter.ofPattern("EEEE, MMMM d, yyyy"))
+}
+
+fun formatWeekRange(startDate: LocalDate): String {
+    val endDate = startDate.plusDays(6)
+    return "${startDate.format(DateTimeFormatter.ofPattern("MMM d"))} - " +
+            "${endDate.format(DateTimeFormatter.ofPattern("MMM d, yyyy"))}"
+}
+
+fun formatMonthYear(yearMonth: YearMonth): String {
+    return yearMonth.format(DateTimeFormatter.ofPattern("MMMM yyyy"))
+}
 
 fun cleanedEventTitle(title: String): String {
     return title
@@ -1991,17 +2179,6 @@ fun cleanedEventTitle(title: String): String {
         .trim()
 }
 
-//@Preview(showBackground = true)
-//@Composable
-//fun ScheduleScreenPreview(){
-//    Capstone2026Theme {
-//        AppNavGraph(
-//            modifier = Modifier.padding(innerPadding),
-//            themeMode = themeMode,
-//            onThemeModeChange = { themeMode = it }
-//        )
-//    }
-//}
 
 // helper functions
 data class CalendarEvent(
@@ -2009,7 +2186,8 @@ data class CalendarEvent(
     val start: Date,
     val end: Date? = null,
     val eventType: String? = null,
-    val notes: String? = null
+    val notes: String? = null,
+    val isAllDay: Boolean = false
 )
 fun Date.toLocalDate(): LocalDate =
     Instant.ofEpochMilli(time)

@@ -34,8 +34,20 @@ def parse_date_from_line(line: str):
         "Sep": 9, "Oct": 10, "Nov": 11, "Dec": 12
     }
 
-    return f"{YEAR:04d}-{month_map[month]:02d}-{day:02d}"
+    return f"{inferred_year:04d}-{month_map[month]:02d}-{day:02d}"
 
+def infer_year_from_syllabus(full_text: str) -> int:
+    lines = [line.strip() for line in full_text.splitlines() if line.strip()]
+    top_text = "\n".join(lines[:50])
+
+    # Look for explicit years like 2025, 2026, 2027
+    years = re.findall(r"\b(20\d{2})\b", top_text)
+    if years:
+        return int(years[0])
+
+    # Fallback: use current year if nothing is found
+    from datetime import datetime
+    return datetime.now().year
 
 def dedupe_events(events):
     seen = set()
@@ -98,7 +110,7 @@ def narrow_to_schedule_section(full_text: str) -> str:
     return text
 
 
-def extract_events_with_rules(text: str):
+def extract_events_with_rules(text: str, inferred_year: int):
     lines = [line.strip() for line in text.splitlines() if line.strip()]
     events = []
 
@@ -109,7 +121,7 @@ def extract_events_with_rules(text: str):
             "exam", "midterm", "final", "quiz", "project",
             "assignment", "homework", "hw", "due", "presentation"
         ])
-        parsed_date = parse_date_from_line(line)
+        parsed_date = parse_date_from_line(line,inferred_year)
 
         if not (has_event_word and parsed_date):
             continue
@@ -124,32 +136,59 @@ def extract_events_with_rules(text: str):
     events.sort(key=lambda e: e["date"])
     return dedupe_events(events)
 
+def extract_course_title(full_text: str):
+    lines = [line.strip() for line in full_text.splitlines() if line.strip()]
+
+    patterns = [
+        r"^[A-Z]{2,4}\s*\d{3,4}[:\-]?\s+.+$",       
+        r"^[A-Z]{2,4}\s*\d{3,4}\.\d+[:\-]?\s+.+$",   
+        r"^Course Title[:\s]+(.+)$",                
+        r"^Course[:\s]+(.+)$"
+    ]
+
+    for line in lines[:30]:
+        for pattern in patterns:
+            match = re.match(pattern, line, re.IGNORECASE)
+            if match:
+                if match.groups():
+                    return match.group(1).strip()
+                return line.strip()
+
+    return None
 
 def extract_schedule_from_pdf(pdf_path):
     full_text = extract_text_from_pdf(pdf_path)
+
+    # Extract course title from the full syllabus text
+    course_title = extract_course_title(full_text)
+    inferred_year = infer_year_from_syllabus(full_text)
+
     cleaned_text = narrow_to_schedule_section(full_text)
 
-    # 1) Try rules first
-    rule_events = extract_events_with_rules(cleaned_text)
-    if len(rule_events) >= 3:
-        return {
-            "events": rule_events,
-            "source": "rules"
-        }
-
-    # 2) Fallback to AI if rules are weak
+    # 1) Try AI first
     try:
         ai_events = extract_events_with_llm(cleaned_text)
         if ai_events:
             return {
                 "events": ai_events,
-                "source": "ai"
+                "source": "ai",
+                "course_title": course_title
             }
     except Exception as e:
-        print(f"LLM fallback failed: {e}")
+        print(f"AI extraction failed: {e}")
 
-    # 3) Final fallback: return whatever rules found
+    # 2) Fallback to rules if AI fails or returns nothing
+    rule_events = extract_events_with_rules(cleaned_text, inferred_year)
+    if rule_events:
+        return {
+            "events": rule_events,
+            "source": "rules_fallback",
+            "course_title": course_title
+        }
+
+    # 3) Final empty result
     return {
-        "events": rule_events,
-        "source": "rules_fallback"
+        "events": [],
+        "source": "none",
+        "course_title": course_title
     }

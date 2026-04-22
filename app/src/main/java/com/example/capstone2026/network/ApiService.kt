@@ -7,7 +7,8 @@ import retrofit2.http.Part
 data class ExtractResponse(
     val count: Int = 0,
     val events: List<EventDto> = emptyList(),
-    val source: String = "unknown"
+    val source: String = "unknown",
+    val course_title: String? = null
 )
 
 data class EventDto(
