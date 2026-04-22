@@ -402,7 +402,7 @@ fun AddEventJson(
 ) {
     var title by remember { mutableStateOf("") }
 
-    var eventType by remember { mutableStateOf("Sleep") }
+    var eventType by remember { mutableStateOf("Class") }
     var inflexible by remember { mutableStateOf("True") }
     var notes by remember { mutableStateOf("") }
     var startDateText by remember { mutableStateOf(selectedDate.toString()) }
