@@ -223,8 +223,8 @@ fun AppNavGraph(
         composable("upload") {
             UploadSyllabusScreen(
                 navController = navController,
-                onImportEvents = { extractedEvents ->
-                    val converted = extractedEvents.mapNotNull { it.toCalendarEvent() }
+                onImportEvents = { extractedEvents, courseTitle ->
+                    val converted = extractedEvents.mapNotNull { it.toCalendarEvent(courseTitle) }
 
                     val actuallyAdded = mutableListOf<CalendarEvent>()
 
@@ -1817,12 +1817,25 @@ fun HomeScreen(
             } else {
                 upcomingEvents.forEach { event ->
                     Card(
-                        modifier = Modifier.fillMaxWidth()
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable {
+                                val eventDate = event.start.toLocalDate()
+                                navController.navigate("schedule_daily/$eventDate")
+                            }
                     ) {
                         Column(modifier = Modifier.padding(12.dp)) {
                             Text(text = cleanedEventTitle(event.title),
                             fontWeight = FontWeight.Bold)
-                            Text(text = formatEventDate(event),
+                            event.courseTitle?.let {
+                                Text(
+                                    text = it,
+                                    fontSize = 13.sp,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Text(text = formatEventDate(event)
+                            ,
                             fontSize = 14.sp)
                             if (!event.notes.isNullOrBlank()) {
                                     Text("Notes: " + event.notes)
@@ -2049,6 +2062,7 @@ fun EditEventDialog(
     var title by remember { mutableStateOf(event.title) }
     var eventType by remember { mutableStateOf(event.eventType ?: "") }
     var notes by remember { mutableStateOf(event.notes ?: "") }
+    var isAllDay by remember { mutableStateOf(event.isAllDay) }
     var timeError by remember { mutableStateOf<String?>(null) }
 
     val startLocal = event.start.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime()
@@ -2083,35 +2097,45 @@ fun EditEventDialog(
                     label = { Text("Date (yyyy-MM-dd)") },
                     modifier = Modifier.fillMaxWidth()
                 )
-
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = startHour,
-                        onValueChange = { startHour = it.filter(Char::isDigit).take(2) },
-                        label = { Text("Start Hr") },
-                        modifier = Modifier.weight(1f)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isAllDay,
+                        onCheckedChange = { isAllDay = it }
                     )
-                    OutlinedTextField(
-                        value = startMinute,
-                        onValueChange = { startMinute = it.filter(Char::isDigit).take(2) },
-                        label = { Text("Start Min") },
-                        modifier = Modifier.weight(1f)
-                    )
+                    Text("All day event")
                 }
+                if(!isAllDay) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = startHour,
+                            onValueChange = { startHour = it.filter(Char::isDigit).take(2) },
+                            label = { Text("Start Hr") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = startMinute,
+                            onValueChange = { startMinute = it.filter(Char::isDigit).take(2) },
+                            label = { Text("Start Min") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
 
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedTextField(
-                        value = endHour,
-                        onValueChange = { endHour = it.filter(Char::isDigit).take(2) },
-                        label = { Text("End Hr") },
-                        modifier = Modifier.weight(1f)
-                    )
-                    OutlinedTextField(
-                        value = endMinute,
-                        onValueChange = { endMinute = it.filter(Char::isDigit).take(2) },
-                        label = { Text("End Min") },
-                        modifier = Modifier.weight(1f)
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedTextField(
+                            value = endHour,
+                            onValueChange = { endHour = it.filter(Char::isDigit).take(2) },
+                            label = { Text("End Hr") },
+                            modifier = Modifier.weight(1f)
+                        )
+                        OutlinedTextField(
+                            value = endMinute,
+                            onValueChange = { endMinute = it.filter(Char::isDigit).take(2) },
+                            label = { Text("End Min") },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
                 }
                 timeError?.let {
                     Text(
@@ -2141,24 +2165,40 @@ fun EditEventDialog(
                 onClick = {
                     try {
                         val date = LocalDate.parse(dateText)
-                        val startDateTime = date.atTime(startHour.toInt(), startMinute.toInt())
-                        val endDateTime = date.atTime(endHour.toInt(), endMinute.toInt())
 
-                        if (!endDateTime.isAfter(startDateTime)) {
-                            timeError = "End time must be later than start time"
-                            return@TextButton
+                        val updatedEvent = if (isAllDay) {
+                            val startDateTime = date.atStartOfDay()
+
+                            CalendarEvent(
+                                title = title,
+                                start = Date.from(startDateTime.atZone(ZoneId.systemDefault()).toInstant()),
+                                end = null,
+                                eventType = eventType.ifBlank { null },
+                                notes = notes.ifBlank { null },
+                                isAllDay = true,
+                                courseTitle = event.courseTitle
+                            )
                         } else {
-                            timeError = null
-                        }
+                            val startDateTime = date.atTime(startHour.toInt(), startMinute.toInt())
+                            val endDateTime = date.atTime(endHour.toInt(), endMinute.toInt())
 
-                        val updatedEvent = CalendarEvent(
-                            title = title,
-                            start = Date.from(startDateTime.atZone(ZoneId.systemDefault()).toInstant()),
-                            end = Date.from(endDateTime.atZone(ZoneId.systemDefault()).toInstant()),
-                            eventType = eventType.ifBlank { null },
-                            notes = notes.ifBlank { null },
-                            isAllDay = false
-                        )
+                            if (!endDateTime.isAfter(startDateTime)) {
+                                timeError = "End time must be later than start time"
+                                return@TextButton
+                            } else {
+                                timeError = null
+                            }
+
+                            CalendarEvent(
+                                title = title,
+                                start = Date.from(startDateTime.atZone(ZoneId.systemDefault()).toInstant()),
+                                end = Date.from(endDateTime.atZone(ZoneId.systemDefault()).toInstant()),
+                                eventType = eventType.ifBlank { null },
+                                notes = notes.ifBlank { null },
+                                isAllDay = false,
+                                courseTitle = event.courseTitle
+                            )
+                        }
 
                         onSave(updatedEvent)
                     } catch (e: Exception) {
@@ -2317,7 +2357,8 @@ data class CalendarEvent(
     val end: Date? = null,
     val eventType: String? = null,
     val notes: String? = null,
-    val isAllDay: Boolean = false
+    val isAllDay: Boolean = false,
+    val courseTitle: String? = null
 )
 fun Date.toLocalDate(): LocalDate =
     Instant.ofEpochMilli(time)

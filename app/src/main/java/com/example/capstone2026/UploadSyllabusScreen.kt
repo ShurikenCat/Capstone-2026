@@ -27,12 +27,11 @@ import java.util.Calendar
 import java.util.Locale
 import androidx.navigation.NavController
 import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.style.TextAlign
 
 @Composable
 fun UploadSyllabusScreen(
     navController: NavController,
-    onImportEvents: (List<EventDto>) -> Unit,
+    onImportEvents: (List<EventDto>, String?) -> Unit,
     onUndoLastImport: () -> Unit,
     canUndoLastImport: Boolean
 ) {
@@ -150,7 +149,7 @@ fun UploadSyllabusScreen(
 
             if (events.isNotEmpty()) {
                 Button(
-                    onClick = { onImportEvents(events) },
+                    onClick = { onImportEvents(events, courseTitle) },
                     enabled = !loading,
                     modifier = Modifier.fillMaxWidth()
                 ) {
@@ -169,7 +168,7 @@ fun UploadSyllabusScreen(
                     items(events.take(40)) { event ->
                         EventCard(
                             event = event,
-                            onAddToAppCalendar = { onImportEvents(listOf(event)) }
+                            onAddToAppCalendar = { onImportEvents(listOf(event), courseTitle) }
                         )
                     }
                 }
@@ -238,7 +237,7 @@ fun EventCard(
     }
 }
 
-fun EventDto.toCalendarEvent(): CalendarEvent? {
+fun EventDto.toCalendarEvent(courseTitle: String? = null): CalendarEvent? {
     if (date.isBlank()) return null
 
     return try {
@@ -265,7 +264,10 @@ fun EventDto.toCalendarEvent(): CalendarEvent? {
             title = title,
             start = beginCalendar.time,
             end = null,
-            isAllDay = true
+            eventType = type,
+            notes = assignment,
+            isAllDay = true,
+            courseTitle = courseTitle
         )
     } catch (e: Exception) {
         e.printStackTrace()
