@@ -1,6 +1,7 @@
 import os
 import json
 import re
+from typing import Optional, List, Dict
 from groq import Groq
 
 ALLOWED_EVENT_TYPES = {"exam", "quiz", "assignment", "project", "class"}
@@ -56,7 +57,7 @@ def extract_json_object(text: str) -> dict:
     return json.loads(text[start:end + 1])
 
 
-def normalize_event(event: dict) -> dict | None:
+def normalize_event(event: dict) -> Optional[dict]:
     if not isinstance(event, dict):
         return None
 
@@ -85,7 +86,7 @@ def normalize_event(event: dict) -> dict | None:
     }
 
 
-def dedupe_events(events: list[dict]) -> list[dict]:
+def dedupe_events(events: List[Dict]) -> List[Dict]:
     seen = set()
     unique = []
 
@@ -102,7 +103,7 @@ def dedupe_events(events: list[dict]) -> list[dict]:
     return unique
 
 
-def extract_events_with_llm(cleaned_text: str) -> list[dict]:
+def extract_events_with_llm(cleaned_text: str) -> List[Dict]:
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable is not set.")

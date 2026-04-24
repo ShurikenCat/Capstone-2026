@@ -60,6 +60,8 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -169,11 +171,9 @@ fun AppNavGraph(
     themeMode: ThemeMode,
     onThemeModeChange: (ThemeMode) -> Unit
 ) {
-
     val navController = rememberNavController()
     val context = LocalContext.current
 
-    // Load events from ICS
     val initialEvents by remember {
         mutableStateOf(
             try {
@@ -191,24 +191,33 @@ fun AppNavGraph(
         mutableStateListOf<CalendarEvent>().apply { addAll(initialEvents) }
     }
 
-    var focusedDate by remember { mutableStateOf(LocalDate.now())}
-    var lastImportedEvents by remember { mutableStateOf<List<CalendarEvent>>(emptyList())}
+    var focusedDate by remember { mutableStateOf(LocalDate.now()) }
+    var lastImportedEvents by remember { mutableStateOf<List<CalendarEvent>>(emptyList()) }
 
     NavHost(
         navController = navController,
-        startDestination = "home",
+        startDestination = "login",
         modifier = modifier
     ) {
+        composable("login") {
+            LoginScreen(
+                onLoginSuccess = {
+                    navController.navigate("home") {
+                        popUpTo("login") { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
+            )
+        }
 
         composable("home") {
             HomeScreen(
-            allEvents = allEvents,
-            onNavigateToUpload = { navController.navigate("upload") },
-            onNavigateToDaily = { navController.navigate("schedule_daily") },
-            onNavigateToWeekly = { navController.navigate("schedule_weekly") },
-            onNavigateToMonthly = { navController.navigate("schedule_monthly") },
-//            onNavigateToSettings = { navController.navigate("settings")},
-            navController = navController
+                allEvents = allEvents,
+                onNavigateToUpload = { navController.navigate("upload") },
+                onNavigateToDaily = { navController.navigate("schedule_daily") },
+                onNavigateToWeekly = { navController.navigate("schedule_weekly") },
+                onNavigateToMonthly = { navController.navigate("schedule_monthly") },
+                navController = navController
             )
         }
         composable("upload") {
@@ -298,7 +307,13 @@ fun AppNavGraph(
             SettingsScreen(
                 navController = navController,
                 themeMode = themeMode,
-                onThemeModeChange = onThemeModeChange
+                onThemeModeChange = onThemeModeChange,
+                onSignOut = {
+                    navController.navigate("login") {
+                        popUpTo(0) { inclusive = true }
+                        launchSingleTop = true
+                    }
+                }
             )
         }
     }
@@ -1053,6 +1068,102 @@ fun AddEventJson(
 }
 
 @Composable
+fun LoginScreen(
+    onLoginSuccess: () -> Unit
+) {
+    var username by remember { mutableStateOf("") }
+    var password by remember { mutableStateOf("") }
+    var passwordVisible by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf("") }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .padding(24.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Card(
+            modifier = Modifier.fillMaxWidth(),
+            elevation = CardDefaults.cardElevation(defaultElevation = 6.dp)
+        ) {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(24.dp),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Text(
+                    text = "Login",
+                    style = MaterialTheme.typography.headlineMedium
+                )
+
+                OutlinedTextField(
+                    value = username,
+                    onValueChange = {
+                        username = it
+                        errorMessage = ""
+                    },
+                    label = { Text("Username") },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                OutlinedTextField(
+                    value = password,
+                    onValueChange = {
+                        password = it
+                        errorMessage = ""
+                    },
+                    label = { Text("Password") },
+                    visualTransformation = if (passwordVisible) {
+                        VisualTransformation.None
+                    } else {
+                        PasswordVisualTransformation()
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    singleLine = true
+                )
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Checkbox(
+                        checked = passwordVisible,
+                        onCheckedChange = { passwordVisible = it }
+                    )
+                    Text("Show password")
+                }
+
+                if (errorMessage.isNotBlank()) {
+                    Text(
+                        text = errorMessage,
+                        color = MaterialTheme.colorScheme.error
+                    )
+                }
+
+                Button(
+                    onClick = {
+
+                        if (username == "admin" && password == "override") {
+                            onLoginSuccess()
+                        }
+                        else if(username == "user" && password == "goodpassword"){
+                            onLoginSuccess()
+                        } else{
+                            errorMessage = "Invalid username or password"
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Sign In")
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun DailyScheduleScreen(
     navController: NavController,
     allEvents: SnapshotStateList<CalendarEvent>,
@@ -1780,7 +1891,8 @@ fun HomeScreen(
 fun SettingsScreen(
     navController: NavController,
     themeMode: ThemeMode,
-    onThemeModeChange: (ThemeMode) -> Unit
+    onThemeModeChange: (ThemeMode) -> Unit,
+    onSignOut: () -> Unit
 ) {
     Box(
         modifier = Modifier
@@ -1834,6 +1946,18 @@ fun SettingsScreen(
                     )
                     Text("Dark")
                 }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            Button(
+                onClick = onSignOut,
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = MaterialTheme.colorScheme.error,
+                    contentColor = MaterialTheme.colorScheme.onError
+                )
+            ) {
+                Text("Sign Out")
             }
         }
 

@@ -297,7 +297,7 @@ def syllabus_json_to_event_json(
         "syllabus_object": syllabus_data
     }
 
-    client = Groq(api_key="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")
+    client = Groq(api_key="api key would go here")
 
     parsed = None
     last_error = None
