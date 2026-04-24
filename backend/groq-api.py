@@ -32,6 +32,7 @@ def process_all_syllabus_images(
     model="meta-llama/llama-4-scout-17b-16e-instruct",
     sleep_seconds=10
 ):
+    load_dotenv()
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable is not set.")
@@ -297,7 +298,9 @@ def syllabus_json_to_event_json(
         "syllabus_object": syllabus_data
     }
 
-    client = Groq(api_key="api key would go here")
+    load_dotenv()
+
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
     parsed = None
     last_error = None
