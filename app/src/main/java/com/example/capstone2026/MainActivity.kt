@@ -51,6 +51,7 @@ import java.time.ZoneId
 import java.util.*
 import java.time.format.DateTimeFormatter
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.res.painterResource
 import java.time.DayOfWeek
@@ -60,6 +61,7 @@ import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.Icon
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 
@@ -1120,6 +1122,10 @@ fun LoginScreen(
                     } else {
                         PasswordVisualTransformation()
                     },
+                    keyboardOptions = KeyboardOptions(
+                        autoCorrectEnabled = false,
+                        keyboardType = KeyboardType.Password
+                    ),
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true
                 )
