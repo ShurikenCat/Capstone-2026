@@ -10,6 +10,7 @@ captures/
 local.properties
 
 # IDE FILES
+.vscode
 .idea/
 *.iml
 
