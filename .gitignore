@@ -1,24 +1,39 @@
-*.iml
-.gradle
-/local.properties
-/.idea/caches
-/.idea/libraries
-/.idea/modules.xml
-/.idea/workspace.xml
-/.idea/navEditor.xml
-/.idea/assetWizardSettings.xml
-.DS_Store
-/build
-/captures
-.externalNativeBuild
-.cxx
+# ANDROID / GRADLE
+.gradle/
+build/
+app/build/
+captures/
+.externalNativeBuild/
+.cxx/
+
+# Local config
 local.properties
-/backend/__pycache__
-/backend/.venv
-.idea/misc.xml
-.idea/workspace.xml
-/build/
-/app/build/
-/.gradle/
+
+# IDE FILES
 .idea/
+*.iml
+
+# macOS
+.DS_Store
+
+
+# PYTHON BACKEND
+backend/.venv/
+backend/__pycache__/
+*.pyc
+*.pyo
+.env
+venv/
 .venv/
+
+# LOGS / TEMP
+*.log
+tmp/
+temp/
+
+# GENERATED / BINARIES
+*.apk
+*.aab
+
+node_modules/
+dist/
