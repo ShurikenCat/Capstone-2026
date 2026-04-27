@@ -38,3 +38,5 @@ temp/
 
 node_modules/
 dist/
+*.mkv
+*.mp4
