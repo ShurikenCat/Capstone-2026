@@ -1,4 +1,4 @@
-package com.example.capstone2026
+package com.example.capstone2026.ui.screens
 
 import android.content.Context
 import com.example.capstone2026.ui.components.AppMenu

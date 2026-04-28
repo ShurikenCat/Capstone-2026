@@ -18,6 +18,10 @@ data class EventDto(
     val assignment: String? = null
 )
 
+/**
+ * Retrofit API definition for communicating with the backend.
+ * Handles syllabus upload and event extraction.
+ */
 interface ApiService {
     @Multipart
     @POST("extract")

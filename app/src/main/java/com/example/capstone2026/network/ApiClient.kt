@@ -3,11 +3,13 @@ import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
-import okhttp3.MediaType.Companion.toMediaType
-import okhttp3.MultipartBody
-import okhttp3.RequestBody.Companion.toRequestBody
+
+/**
+ * Configures Retrofit client with logging and timeout settings.
+ * Provides a singleton API instance for network calls.
+ */
 object ApiClient {
-    private const val BASE_URL = "https://capstone-2026-3k89.onrender.com"
+    private const val BASE_URL = "https://capstone-2026-3k89.onrender.com/"
 
     private val logging = HttpLoggingInterceptor().apply {
         level = HttpLoggingInterceptor.Level.BODY
