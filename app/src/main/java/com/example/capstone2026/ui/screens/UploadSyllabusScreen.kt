@@ -1,6 +1,7 @@
 package com.example.capstone2026
 
 import android.content.Context
+import com.example.capstone2026.ui.components.AppMenu
 import android.content.Intent
 import android.net.Uri
 import android.provider.CalendarContract
@@ -27,6 +28,7 @@ import java.util.Calendar
 import java.util.Locale
 import androidx.navigation.NavController
 import androidx.compose.ui.Alignment
+import com.example.capstone2026.data.CalendarEvent
 
 @Composable
 fun UploadSyllabusScreen(
