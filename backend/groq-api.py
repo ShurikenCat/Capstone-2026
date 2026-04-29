@@ -25,7 +25,7 @@ def convert_all_pdfs_to_images(image_format="png"):
         for i, image in enumerate(images, start=1):
             image.save(pdf_output_folder / f"page_{i}.{image_format.upper()}", image_format.upper())
 
-#PDF Parser. Probably best to get your own API key as this is tuned for ONE user per key
+#Calls Groq's API for Llama-4-Scout-17B to read each syllabi image and extract important data
 def process_all_syllabus_images(
     image_root="syllabi_images",
     output_root="groq_results",
@@ -101,11 +101,10 @@ def process_all_syllabus_images(
 
         time.sleep(sleep_seconds)
 
-#Removes the markdown that the AI returns even when explicitly telling JSON
+#Removes any markdown that the AI returns
 def extract_json_object(text: str) -> dict:
     text = (text or "").strip()
 
-    #I never noticed any issue but we do this anyways
     try:
         return json.loads(text)
     except json.JSONDecodeError:
@@ -124,7 +123,7 @@ def extract_json_object(text: str) -> dict:
 
     return json.loads(text[start:end + 1])
 
-#AI assisted section. Not really sure what it's for
+#Response function for AI. Attempts 2 different methods of receiving responses, returning whichever succeeds first.
 def get_choice_text(response) -> str:
     def normalize_content(content):
         if content is None:
@@ -218,7 +217,7 @@ def get_choice_text(response) -> str:
         f"Response type: {type(response)} | Response repr: {repr(response)[:1000]}"
     )
 
-
+#Maps raw syllabi json event data to a dictionary of formatted json events 
 def validate_syllabus_event_payload(data: dict) -> dict:
     if not isinstance(data, dict):
         raise ValueError("Top-level response is not an object.")
@@ -254,7 +253,7 @@ def validate_syllabus_event_payload(data: dict) -> dict:
 
     return {"events": cleaned}
 
-
+#Groq API call to Qwen3-32B that takes in syllabi events json and returns json that is formatted for ICS files.
 def syllabus_json_to_event_json(
     syllabus_json_file,
     output_json_file=None,
@@ -369,7 +368,7 @@ def syllabus_json_to_event_json(
         "assignment_event_count": sum(1 for e in parsed["events"] if e["event_kind"] == "assignment")
     }
 
-
+#Creates ICS formatted user event
 def build_user_event_item(item: dict) -> dict | None:
     if not isinstance(item, dict):
         return None
@@ -418,7 +417,7 @@ def build_user_event_item(item: dict) -> dict | None:
 
     return event
 
-
+#Adds a given event to the appropriate calendar ICS
 def add_event_to_calendar(cal: Calendar, item: dict):
     dtstart = item.get("dtstart", "")
     dtend = item.get("dtend", "")
@@ -458,7 +457,7 @@ def add_event_to_calendar(cal: Calendar, item: dict):
 
     cal.add_component(event)
 
-
+#Combines all syllabi json and user event json into a singular calendar ICS file
 def merge_event_jsons_to_ics(
     event_json_folder="calendar_json",
     user_events_file=None,
@@ -510,8 +509,8 @@ def merge_event_jsons_to_ics(
         "merged_user_events": user_event_count
     }
 
-
-def process_all_syllabi_then_merge(
+#Function that reads processed syllabi json, merges it into an ics file, and outputs a json object with information about the ICS file that was created 
+def process_all_syllabi_json_then_merge(
     syllabus_json_folder="groq_results",
     calendar_json_folder="calendar_json",
     user_events_file=None,
@@ -556,18 +555,10 @@ def process_all_syllabi_then_merge(
     }
 
 
-"""PDFs -> Images -> Encoded Images -> AI Data Extractor -> AI Schedule Generator -> ICS"""
-#Important note: I couldn't figure out how to clean out the folders between potentially different generations
-#THAT WILL cause issues, but as long as you just delete all the files (specifically in groq_results, syllabi_images, and calendar_json)
-#should be fine. Any irrelevant pdfs in syllabi_pdfs should also be deleted.
-
-#All of these will likely need to be modified to be the actual string containing the path
+#PDFs -> Images -> Encoded Images -> AI Data Extractor -> AI Schedule Generator -> ICS
 convert_all_pdfs_to_images()
-
 process_all_syllabus_images()
-
-#User_events_file is a filepath. Defaults to None (aka no events submitted). Output ics is just a name that is outputted. Output file dir can probably be changed.
-process_all_syllabi_then_merge(
+process_all_syllabi_json_then_merge(
         syllabus_json_folder="groq_results",
         calendar_json_folder="calendar_json",
         user_events_file=None,
