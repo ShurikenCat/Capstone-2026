@@ -6,4 +6,4 @@ Download Android Studio: https://developer.android.com/studio
 
 Open a terminal in Android Studio and run the following command:
 
-```git clone https://github.com/ShurikenCat/Capstone-2026```
+`git clone https://github.com/ShurikenCat/Capstone-2026`
