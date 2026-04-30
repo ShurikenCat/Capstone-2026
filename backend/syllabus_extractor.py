@@ -8,6 +8,7 @@ YEAR = 2026  # you can improve this later by inferring from syllabus text
 
 
 def normalize_event_type(text: str) -> str:
+    """Classifies a syllabus line as an exam, quiz, project, assignment, or class event."""
     t = text.lower()
     if any(x in t for x in ["midterm", "final", "exam", "test"]):
         return "exam"
@@ -20,7 +21,7 @@ def normalize_event_type(text: str) -> str:
     return "class"
 
 
-def parse_date_from_line(line: str):
+def parse_date_from_line(line: str, inferred_year):
     m = re.search(rf"(?:Mon|Tue|Wed|Thu|Fri|Sat|Sun)?\s*({MONTHS})\s+(\d{{1,2}})", line)
     if not m:
         return None
@@ -67,6 +68,7 @@ def dedupe_events(events):
 
 
 def extract_text_from_pdf(pdf_path: str) -> str:
+    """Reads text from every page of a syllabus PDF using pdfplumber."""
     full_text = ""
 
     with pdfplumber.open(pdf_path) as pdf:
@@ -77,6 +79,7 @@ def extract_text_from_pdf(pdf_path: str) -> str:
 
 
 def narrow_to_schedule_section(full_text: str) -> str:
+    """Attempts to isolate the schedule/calendar section of the syllabus."""
     lower = full_text.lower()
     schedule_markers = [
         "course schedule",
@@ -157,6 +160,11 @@ def extract_course_title(full_text: str):
     return None
 
 def extract_schedule_from_pdf(pdf_path):
+    """
+    Main extraction pipeline.
+    Extracts course title, infers the year, tries AI extraction first,
+    and falls back to rule-based extraction if needed.
+    """
     full_text = extract_text_from_pdf(pdf_path)
 
     # Extract course title from the full syllabus text

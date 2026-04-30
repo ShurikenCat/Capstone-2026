@@ -5,6 +5,10 @@ import os
 
 from syllabus_extractor import extract_schedule_from_pdf
 
+"""
+FastAPI backend for Ordo.
+Handles health checks and syllabus PDF uploads from the Android app.
+"""
 app = FastAPI()
 
 app.add_middleware(
@@ -24,6 +28,10 @@ def health():
 
 @app.post("/extract")
 async def extract(file: UploadFile = File(...)):
+    """
+    Accepts a syllabus PDF, temporarily saves it, extracts calendar events,
+    and returns structured event data to the Android frontend.
+    """
     with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp:
         tmp.write(await file.read())
         tmp_path = tmp.name
