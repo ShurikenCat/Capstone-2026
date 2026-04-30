@@ -4,9 +4,14 @@ import re
 from typing import Optional, List, Dict
 from groq import Groq
 
+"""
+LLM extraction utilities for converting syllabus text into structured calendar events.
+"""
+
 ALLOWED_EVENT_TYPES = {"exam", "quiz", "assignment", "project", "class"}
 
 def build_prompt(cleaned_text: str) -> str:
+    """Builds the prompt sent to the LLM for event extraction."""
     return f"""
 You are extracting calendar events from a university course syllabus.
 
@@ -58,6 +63,7 @@ def extract_json_object(text: str) -> dict:
 
 
 def normalize_event(event: dict) -> Optional[dict]:
+    """Validates and normalizes one raw LLM event into the app's expected format."""
     if not isinstance(event, dict):
         return None
 
@@ -104,6 +110,7 @@ def dedupe_events(events: List[Dict]) -> List[Dict]:
 
 
 def extract_events_with_llm(cleaned_text: str) -> List[Dict]:
+    """Calls the Groq API and returns cleaned, deduplicated syllabus events."""
     api_key = os.getenv("GROQ_API_KEY")
     if not api_key:
         raise ValueError("GROQ_API_KEY environment variable is not set.")
